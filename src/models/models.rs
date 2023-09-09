@@ -5,10 +5,7 @@ use serde_json;
 use chrono::prelude::*;
 use rust_decimal::prelude::*;
 
-pub type OrderType = String;
-pub type Side = String;
-pub type TimeInForceType = String;
-pub type OrderStatus = String;
+use crate::models::types::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Order {
