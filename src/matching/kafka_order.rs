@@ -4,7 +4,7 @@ use rdkafka::error::{KafkaError};
 use std::borrow::Borrow;
 use rdkafka::consumer::Consumer;
 use rdkafka::topic_partition_list::Offset::OffsetTail;
-use rdkafka::Offset;
+use rdkafka::{Offset, Message};
 use rdkafka::util::Timeout;
 use std::time::Duration;
 
@@ -55,5 +55,23 @@ impl KafkaOrderReader {
                 Some(e)
             }
         };
+    }
+
+    pub async fn fetch_message(&mut self) -> (i64, Option<Vec<u8>>, Option<KafkaError>) {
+        return match self.order_consumer.recv().await {
+            Err(e) => {
+                (0, None, Some(e))
+            },
+            Ok(message) => {
+                match message.payload() {
+                    None => {
+                        (0, None, None)
+                    }
+                    Some(payload) => {
+                        (message.offset(), Some(payload.to_vec()), None)
+                    }
+                }
+            }
+        }
     }
 }
