@@ -7,7 +7,7 @@ use rdkafka::error::KafkaResult;
 
 pub type DefaultConsumer = StreamConsumer<DefaultConsumerContext>;
 
-pub fn new_kafka_reader(brokers: &Vec<String>, topic: &String, time_out: u64) -> KafkaResult<DefaultConsumer> {
+pub fn new_kafka_consumer(brokers: &[&str], topic: &str, time_out: u64) -> KafkaResult<DefaultConsumer> {
     let consumer: DefaultConsumer =
         ClientConfig::new()
             .set("bootstrap.servers", brokers.join(","))
@@ -16,7 +16,7 @@ pub fn new_kafka_reader(brokers: &Vec<String>, topic: &String, time_out: u64) ->
             .set("enable.auto.commit", "true")
             .create_with_context(DefaultConsumerContext)?;
 
-    consumer.borrow().subscribe(vec![topic.clone().as_str()].borrow())?;
+    consumer.subscribe(&[topic])?;
 
     Ok(consumer)
 }

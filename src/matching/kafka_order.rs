@@ -1,5 +1,5 @@
 use crate::utils::kafka::DefaultConsumer;
-use crate::utils::kafka::new_kafka_reader;
+use crate::utils::kafka::new_kafka_consumer;
 use rdkafka::error::{KafkaError};
 use std::borrow::Borrow;
 use rdkafka::consumer::Consumer;
@@ -13,19 +13,19 @@ const TOPIC_ORDER_PREFIX: &str = "matching_order_";
 
 pub struct KafkaOrderReader {
     pub topic: String,
-    pub order_reader: DefaultConsumer,
+    pub order_consumer: DefaultConsumer,
 }
 
 impl KafkaOrderReader {
-    pub fn new_kafka_order_reader(&mut self, brokers: &Vec<String>, product_id: &String, time_out: u64) -> Option<KafkaError> {
-        self.topic = vec![TOPIC_ORDER_PREFIX.to_owned(), product_id.clone()].join("");
-        return match new_kafka_reader(
+    pub fn new_kafka_order_consumer(&mut self, brokers: &[&str], product_id: &str, time_out: u64) -> Option<KafkaError> {
+        self.topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
+        return match new_kafka_consumer(
             brokers,
-            &self.topic,
+            self.topic.as_str(),
             time_out,
         ) {
-            Ok(dcc) => {
-                self.order_reader = dcc;
+            Ok(dc) => {
+                self.order_consumer = dc;
                 None
             }
             Err(e) => {
@@ -42,8 +42,8 @@ impl KafkaOrderReader {
                 Offset::Offset(offset)
             };
 
-        return match self.order_reader.seek(
-            &self.topic,
+        return match self.order_consumer.seek(
+            self.topic.as_str(),
             0,
             offset,
             Timeout::After(Duration::from_secs(time_out)),
