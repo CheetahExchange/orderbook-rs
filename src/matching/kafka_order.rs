@@ -7,6 +7,7 @@ use rdkafka::topic_partition_list::Offset::OffsetTail;
 use rdkafka::{Offset, Message};
 use rdkafka::util::Timeout;
 use std::time::Duration;
+use crate::models::models::Order;
 
 const TOPIC_ORDER_PREFIX: &str = "matching_order_";
 
@@ -61,7 +62,7 @@ impl KafkaOrderReader {
         return match self.order_consumer.recv().await {
             Err(e) => {
                 (0, None, Some(e))
-            },
+            }
             Ok(message) => {
                 match message.payload() {
                     None => {
@@ -72,6 +73,19 @@ impl KafkaOrderReader {
                     }
                 }
             }
-        }
+        };
+    }
+
+    pub async fn fetch_order(&mut self) -> (i64, Option<Order>) {
+        let (offset, payload, _) = self.fetch_message().await;
+        return match payload {
+            None => (0, None),
+            Some(v) => {
+                match serde_json::from_slice(&v) {
+                    Err(_) => (0, None),
+                    Ok(order) => (offset, order)
+                }
+            }
+        };
     }
 }
