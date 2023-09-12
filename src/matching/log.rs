@@ -5,6 +5,7 @@ use serde_json;
 use chrono::prelude::*;
 use rust_decimal::Decimal;
 use crate::models::types::{Side, TimeInForceType};
+use crate::matching::order_book::BookOrder;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LogType {
@@ -43,6 +44,23 @@ impl Log for OpenLog {
     }
 }
 
+pub fn new_open_log(log_seq: i64, product_id: &str, taker_order: BookOrder) -> OpenLog {
+    OpenLog {
+        base: Base {
+            r#type: LogType::LogTypeOpen,
+            sequence: log_seq,
+            product_id: product_id.to_string(),
+            time: Utc::now(),
+        },
+        order_id: taker_order.order_id,
+        user_id: taker_order.user_id,
+        remaining_size: taker_order.size,
+        price: taker_order.price,
+        side: taker_order.side,
+        time_in_force: taker_order.time_in_force,
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DoneLog {
     pub base: Base,
@@ -58,6 +76,24 @@ pub struct DoneLog {
 impl Log for DoneLog {
     fn get_seq(self) -> i64 {
         self.base.sequence
+    }
+}
+
+pub fn new_done_log(log_seq: i64, product_id: &str, order: BookOrder, remaining_size: Decimal, reason: &str) -> DoneLog {
+    DoneLog {
+        base: Base {
+            r#type: LogType::LogTypeDone,
+            sequence: log_seq,
+            product_id: product_id.to_string(),
+            time: Utc::now(),
+        },
+        order_id: order.order_id,
+        user_id: order.user_id,
+        price: order.price,
+        remaining_size,
+        reason: reason.to_string(),
+        side: order.side,
+        time_in_force: order.time_in_force,
     }
 }
 
@@ -79,5 +115,27 @@ pub struct MatchLog {
 impl Log for MatchLog {
     fn get_seq(self) -> i64 {
         self.base.sequence
+    }
+}
+
+pub fn new_match_log(log_seq: i64, product_id: &str, trade_seq: i64, taker_order: BookOrder,
+                     maker_order: BookOrder, price: Decimal, size: Decimal) -> MatchLog {
+    MatchLog {
+        base: Base {
+            r#type: LogType::LogTypeMatch,
+            sequence: log_seq,
+            product_id: product_id.to_string(),
+            time: Utc::now(),
+        },
+        trade_seq,
+        taker_order_id: taker_order.order_id,
+        maker_order_id: maker_order.order_id,
+        taker_user_id: taker_order.user_id,
+        maker_user_id: maker_order.user_id,
+        side: maker_order.side,
+        price,
+        size,
+        taker_time_in_force: taker_order.time_in_force,
+        maker_time_in_force: maker_order.time_in_force,
     }
 }
