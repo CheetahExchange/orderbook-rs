@@ -1,11 +1,14 @@
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::DefaultConsumerContext;
 use rdkafka::consumer::stream_consumer::StreamConsumer;
+use rdkafka::producer::DefaultProducerContext;
 use std::borrow::Borrow;
 use rdkafka::consumer::{Consumer};
 use rdkafka::error::KafkaResult;
+use rdkafka::producer::FutureProducer;
 
 pub type DefaultConsumer = StreamConsumer<DefaultConsumerContext>;
+pub type DefaultProducer = FutureProducer<DefaultProducerContext>;
 
 pub fn new_kafka_consumer(brokers: &[&str], topic: &str, time_out: u64) -> KafkaResult<DefaultConsumer> {
     let consumer: DefaultConsumer =
@@ -19,4 +22,14 @@ pub fn new_kafka_consumer(brokers: &[&str], topic: &str, time_out: u64) -> Kafka
     consumer.subscribe(&[topic])?;
 
     Ok(consumer)
+}
+
+pub fn new_kafka_producer(brokers: &[&str], time_out: u64) -> KafkaResult<DefaultProducer> {
+    let producer: DefaultProducer =
+        ClientConfig::new()
+            .set("bootstrap.servers", brokers.join(","))
+            .set("message.timeout.ms", &format!("{}", time_out * 1000))
+            .create_with_context(DefaultProducerContext)?;
+
+    Ok(producer)
 }
