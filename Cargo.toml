@@ -15,4 +15,6 @@ rust_decimal = "1.32"
 rust_decimal_macros = "1.32"
 tokio = { version = "1.2.0", features = ["full"] }
 toml = "0.4"
+mini-redis = "0.4.1"
+
 

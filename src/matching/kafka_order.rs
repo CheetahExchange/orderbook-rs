@@ -18,20 +18,19 @@ pub struct KafkaOrderReader {
 }
 
 impl KafkaOrderReader {
-    pub fn new_kafka_order_consumer(&mut self, brokers: &[&str], product_id: &str, time_out: u64) -> Option<KafkaError> {
-        self.topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
+    pub fn new_kafka_order_consumer(brokers: &[&str], product_id: &str, time_out: u64) -> Result<KafkaOrderReader, KafkaError> {
+        let topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
         return match new_kafka_consumer(
             brokers,
-            self.topic.as_str(),
+            topic.as_str(),
             time_out,
         ) {
-            Ok(dc) => {
-                self.order_consumer = dc;
-                None
-            }
-            Err(e) => {
-                Some(e)
-            }
+            Ok(dc) =>
+                Ok(KafkaOrderReader {
+                    topic,
+                    order_consumer: dc,
+                }),
+            Err(e) => Err(e),
         };
     }
 
