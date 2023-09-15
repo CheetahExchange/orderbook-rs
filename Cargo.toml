@@ -17,5 +17,6 @@ tokio = { version = "1.2.0", features = ["full"] }
 toml = "0.4"
 mini-redis = "0.4.1"
 lazy_static = "1.4.0"
+bytes = "1.5.0"
 
 

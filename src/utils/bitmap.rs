@@ -1,3 +1,7 @@
+// #[macro_use]
+use serde::{Serialize, Deserialize};
+use serde_json;
+
 use lazy_static::lazy_static;
 
 lazy_static! {
@@ -5,6 +9,7 @@ lazy_static! {
     static ref TB: Vec<u8> = vec![254, 253, 251, 247, 239, 223, 191, 127];
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Bitmap {
     data: Vec<u8>,
 }

@@ -6,6 +6,7 @@ use rust_decimal::Decimal;
 
 use crate::models::types::{Side, OrderType, TimeInForceType};
 use crate::models::models::Order;
+use crate::utils::window::Window;
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,4 +32,19 @@ pub fn new_book_order(order: Order) -> BookOrder {
         r#type: order.r#type,
         time_in_force: order.time_in_force,
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OrderBookSnapshot {
+    pub product_id: String,
+    pub orders: Vec<BookOrder>,
+    pub trade_seq: u64,
+    pub log_seq: u64,
+    pub order_id_window: Window,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Snapshot {
+    pub order_book_snapshot: OrderBookSnapshot,
+    pub order_offset: u64,
 }

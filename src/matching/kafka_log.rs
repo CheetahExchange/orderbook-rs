@@ -1,5 +1,7 @@
 use crate::utils::kafka::{DefaultProducer, new_kafka_producer};
-use rdkafka::error::KafkaError;
+
+use std::result::Result;
+use crate::utils::error::CustomError;
 
 const TOPIC_BOOK_MESSAGE_PREFIX: &str = "matching_order_";
 
@@ -10,7 +12,7 @@ pub struct KafkaLogStore {
 }
 
 impl KafkaLogStore {
-    pub fn new_kafka_log_producer(brokers: &[&str], product_id: &str, time_out: u64) -> Result<KafkaLogStore, KafkaError> {
+    pub fn new_kafka_log_producer(brokers: &[&str], product_id: &str, time_out: u64) -> Result<KafkaLogStore, CustomError> {
         return match new_kafka_producer(
             brokers,
             time_out,
@@ -20,7 +22,7 @@ impl KafkaLogStore {
                     topic: String::from(&[TOPIC_BOOK_MESSAGE_PREFIX, product_id].join("")),
                     log_producer: dp,
                 }),
-            Err(e) => Err(e),
+            Err(e) => Err(CustomError::new(&e)),
         };
     }
 }

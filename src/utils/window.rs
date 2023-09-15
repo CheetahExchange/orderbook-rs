@@ -1,6 +1,11 @@
+// #[macro_use]
+use serde::{Serialize, Deserialize};
+use serde_json;
+
 use crate::utils::bitmap::Bitmap;
 use crate::utils::error::CustomError;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Window {
     pub min: u64,
     pub max: u64,
@@ -20,7 +25,7 @@ impl Window {
 
     pub fn put(&mut self, val: u64) -> Option<CustomError> {
         return if val.clone() <= self.min {
-            Some(CustomError(
+            Some(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
                     val,
@@ -34,7 +39,7 @@ impl Window {
             self.bit_map.set(val.clone() % self.cap.clone(), true);
             None
         } else if self.bit_map.get(val.clone() % self.cap.clone()) {
-            Some(CustomError(
+            Some(CustomError::from_string(
                 format!(
                     "existed val {}",
                     val.clone()
