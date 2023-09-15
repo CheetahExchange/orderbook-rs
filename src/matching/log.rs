@@ -30,8 +30,8 @@ pub struct Base {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OpenLog {
     pub base: Base,
-    pub order_id: i64,
-    pub user_id: i64,
+    pub order_id: u64,
+    pub user_id: u64,
     pub remaining_size: Decimal,
     pub price: Decimal,
     pub side: Side,
@@ -64,8 +64,8 @@ pub fn new_open_log(log_seq: i64, product_id: &str, taker_order: BookOrder) -> O
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DoneLog {
     pub base: Base,
-    pub order_id: i64,
-    pub user_id: i64,
+    pub order_id: u64,
+    pub user_id: u64,
     pub price: Decimal,
     pub remaining_size: Decimal,
     pub reason: String,
@@ -100,11 +100,11 @@ pub fn new_done_log(log_seq: i64, product_id: &str, order: BookOrder, remaining_
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MatchLog {
     pub base: Base,
-    pub trade_seq: i64,
-    pub taker_order_id: i64,
-    pub maker_order_id: i64,
-    pub taker_user_id: i64,
-    pub maker_user_id: i64,
+    pub trade_seq: u64,
+    pub taker_order_id: u64,
+    pub maker_order_id: u64,
+    pub taker_user_id: u64,
+    pub maker_user_id: u64,
     pub side: Side,
     pub price: Decimal,
     pub size: Decimal,
@@ -118,7 +118,7 @@ impl Log for MatchLog {
     }
 }
 
-pub fn new_match_log(log_seq: i64, product_id: &str, trade_seq: i64, taker_order: BookOrder,
+pub fn new_match_log(log_seq: i64, product_id: &str, trade_seq: u64, taker_order: BookOrder,
                      maker_order: BookOrder, price: Decimal, size: Decimal) -> MatchLog {
     MatchLog {
         base: Base {

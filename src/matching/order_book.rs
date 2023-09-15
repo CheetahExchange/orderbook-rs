@@ -11,8 +11,8 @@ use crate::utils::window::Window;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BookOrder {
-    pub order_id: i64,
-    pub user_id: i64,
+    pub order_id: u64,
+    pub user_id: u64,
     pub size: Decimal,
     pub funds: Decimal,
     pub price: Decimal,
