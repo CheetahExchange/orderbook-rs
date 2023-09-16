@@ -1,10 +1,13 @@
+use std::collections::BTreeMap;
+use std::iter::Map;
 // #[macro_use]
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use rust_decimal::Decimal;
 
-use crate::models::models::Order;
+use crate::models::models::{Order, Product};
 use crate::models::types::{OrderType, Side, TimeInForceType};
 use crate::utils::window::Window;
 
@@ -37,6 +40,25 @@ pub fn new_book_order(order: Order) -> BookOrder {
 pub struct OrderBookSnapshot {
     pub product_id: String,
     pub orders: Vec<BookOrder>,
+    pub trade_seq: u64,
+    pub log_seq: u64,
+    pub order_id_window: Window,
+}
+
+pub struct AskDepth {
+    pub orders: Map<u64, BookOrder>,
+    pub queue: BTreeMap<PriceOrderIdKeyAsc, u64>,
+}
+
+pub struct BidDepth {
+    pub orders: Map<u64, BookOrder>,
+    pub queue: BTreeMap<PriceOrderIdKeyDesc, u64>,
+}
+
+pub struct OrderBook {
+    pub product: Product,
+    pub ask_depths: AskDepth,
+    pub bid_depths: BidDepth,
     pub trade_seq: u64,
     pub log_seq: u64,
     pub order_id_window: Window,
