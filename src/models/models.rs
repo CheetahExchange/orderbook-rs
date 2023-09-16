@@ -1,12 +1,11 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use chrono::prelude::*;
 use rust_decimal::prelude::*;
 
 use crate::models::types::*;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Product {
@@ -25,7 +24,6 @@ pub struct Product {
     pub quote_scale: i32,
     pub quote_increment: Decimal,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Order {

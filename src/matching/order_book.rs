@@ -1,13 +1,12 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use rust_decimal::Decimal;
 
-use crate::models::types::{Side, OrderType, TimeInForceType};
 use crate::models::models::Order;
+use crate::models::types::{OrderType, Side, TimeInForceType};
 use crate::utils::window::Window;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BookOrder {
@@ -41,10 +40,4 @@ pub struct OrderBookSnapshot {
     pub trade_seq: u64,
     pub log_seq: u64,
     pub order_id_window: Window,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Snapshot {
-    pub order_book_snapshot: OrderBookSnapshot,
-    pub order_offset: u64,
 }

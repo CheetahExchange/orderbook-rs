@@ -1,7 +1,6 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum OrderType {
@@ -32,7 +31,6 @@ pub enum OrderStatus {
     OrderStatusPartial,
     OrderStatusFilled,
 }
-
 
 pub const ORDER_TYPE_LIMIT: OrderType = OrderType::OrderTypeLimit;
 pub const ORDER_TYPE_MARKET: OrderType = OrderType::OrderTypeMarket;

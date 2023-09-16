@@ -1,5 +1,5 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use crate::utils::bitmap::Bitmap;
@@ -28,10 +28,10 @@ impl Window {
             Some(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
-                    val,
-                    self.min,
-                    self.max
-                ).to_string()))
+                    val, self.min, self.max
+                )
+                .to_string(),
+            ))
         } else if val.clone() > self.max {
             let delta = val.clone() - self.max.clone();
             self.min += delta.clone();
@@ -40,10 +40,8 @@ impl Window {
             None
         } else if self.bit_map.get(val.clone() % self.cap.clone()) {
             Some(CustomError::from_string(
-                format!(
-                    "existed val {}",
-                    val.clone()
-                ).to_string()))
+                format!("existed val {}", val.clone()).to_string(),
+            ))
         } else {
             self.bit_map.set(val.clone() % self.cap.clone(), true);
             None

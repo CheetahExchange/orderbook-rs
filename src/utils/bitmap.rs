@@ -1,5 +1,5 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 use lazy_static::lazy_static;
@@ -19,9 +19,7 @@ impl Bitmap {
         let remainder = if max.clone() % 8 == 0 { 0 } else { 1 };
         let mut v: Vec<u8> = vec![];
         v.reserve((max.clone() / 8 + remainder) as usize);
-        Bitmap {
-            data: v,
-        }
+        Bitmap { data: v }
     }
 
     pub fn len(&self) -> usize {

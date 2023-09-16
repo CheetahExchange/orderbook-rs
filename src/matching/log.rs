@@ -1,11 +1,11 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
+use crate::matching::order_book::BookOrder;
+use crate::models::types::{Side, TimeInForceType};
 use chrono::prelude::*;
 use rust_decimal::Decimal;
-use crate::models::types::{Side, TimeInForceType};
-use crate::matching::order_book::BookOrder;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LogType {
@@ -79,7 +79,13 @@ impl Log for DoneLog {
     }
 }
 
-pub fn new_done_log(log_seq: i64, product_id: &str, order: BookOrder, remaining_size: Decimal, reason: &str) -> DoneLog {
+pub fn new_done_log(
+    log_seq: i64,
+    product_id: &str,
+    order: BookOrder,
+    remaining_size: Decimal,
+    reason: &str,
+) -> DoneLog {
     DoneLog {
         base: Base {
             r#type: LogType::LogTypeDone,
@@ -118,8 +124,15 @@ impl Log for MatchLog {
     }
 }
 
-pub fn new_match_log(log_seq: i64, product_id: &str, trade_seq: u64, taker_order: BookOrder,
-                     maker_order: BookOrder, price: Decimal, size: Decimal) -> MatchLog {
+pub fn new_match_log(
+    log_seq: i64,
+    product_id: &str,
+    trade_seq: u64,
+    taker_order: BookOrder,
+    maker_order: BookOrder,
+    price: Decimal,
+    size: Decimal,
+) -> MatchLog {
     MatchLog {
         base: Base {
             r#type: LogType::LogTypeMatch,
