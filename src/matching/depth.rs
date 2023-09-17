@@ -1,10 +1,10 @@
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
-use std::ops::Sub;
-use rust_decimal::Decimal;
 use crate::matching::order_book::BookOrder;
 use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc, PriceOrderIdKeyOrdering};
 use crate::utils::error::CustomError;
+use rust_decimal::Decimal;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Sub;
 
 pub struct Depth<T: PriceOrderIdKeyOrdering + Ord> {
     pub orders: HashMap<u64, BookOrder>,

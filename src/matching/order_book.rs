@@ -5,22 +5,24 @@ use serde_json;
 use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc, PriceOrderIdKeyOrdering};
 use rust_decimal::Decimal;
 
-use crate::matching::log::{new_done_log, new_match_log, Log};
+use crate::matching::depth::{AskDepth, BidDepth};
+use crate::matching::log::{new_done_log, new_match_log, DoneLog, Log};
 use rust_decimal::prelude::Zero;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
-use std::cmp::Ordering;
-use crate::matching::depth::{AskDepth, BidDepth};
 
 use crate::models::models::{Order, Product};
-use crate::models::types::{OrderType, Side, TimeInForceType, DONE_REASON_FILLED};
+use crate::models::types::{
+    OrderType, Side, TimeInForceType, DONE_REASON_CANCELLED, DONE_REASON_FILLED,
+};
 use crate::utils::error::CustomError;
 use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct BookOrder {
     pub order_id: u64,
     pub user_id: u64,
@@ -179,6 +181,58 @@ impl OrderBook {
             },
             _ => true,
         };
+    }
+
+    pub fn cancel_order(&mut self, order: Order) -> Vec<DoneLog> {
+        let mut logs: Vec<DoneLog> = Vec::new();
+        let _ = self.order_id_window.put(order.id);
+        let mut f = false;
+        let mut book_order = BookOrder::default();
+
+        match order.side {
+            Side::SideBuy => {
+                let r = self.ask_depths.orders.get(&order.id);
+                if r.is_some() {
+                    let o = r.unwrap().clone();
+                    match self.ask_depths.decr_size(order.id, o.size) {
+                        Some(e) => {
+                            panic!("{}", e);
+                        }
+                        None => {
+                            f = true;
+                            book_order = o.clone();
+                        }
+                    }
+                }
+            }
+            Side::SideSell => {
+                let r = self.bid_depths.orders.get(&order.id);
+                if r.is_some() {
+                    let o = r.unwrap().clone();
+                    match self.bid_depths.decr_size(order.id, o.size) {
+                        Some(e) => {
+                            panic!("{}", e);
+                        }
+                        None => {
+                            f = true;
+                            book_order = o.clone();
+                        }
+                    }
+                }
+            }
+        };
+
+        if f {
+            let done_log = new_done_log(
+                self.next_log_seq(),
+                &self.product.id,
+                &book_order,
+                book_order.size,
+                DONE_REASON_CANCELLED,
+            );
+            logs.push(done_log);
+        }
+        logs
     }
 
     pub fn next_log_seq(&mut self) -> u64 {

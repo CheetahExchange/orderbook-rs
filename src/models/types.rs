@@ -2,28 +2,32 @@
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum OrderType {
+    #[default]
     OrderTypeLimit,
     OrderTypeMarket,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum Side {
+    #[default]
     SideBuy,
     SideSell,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum TimeInForceType {
+    #[default]
     GoodTillCanceled,
     ImmediateOrCancel,
     GoodTillCrossing,
     FillOrKill,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum OrderStatus {
+    #[default]
     OrderStatusNew,
     OrderStatusOpen,
     OrderStatusCancelling,
@@ -32,8 +36,9 @@ pub enum OrderStatus {
     OrderStatusFilled,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum DoneReason {
+    #[default]
     DoneReasonFilled,
     DoneReasonCancelled,
 }
