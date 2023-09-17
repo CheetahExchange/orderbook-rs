@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::cmp::Ordering::Greater;
 // #[macro_use]
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -7,6 +9,8 @@ use rust_decimal::Decimal;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::ops::{Div, Mul, Sub};
+use rust_decimal::prelude::Zero;
 
 use crate::models::models::{Order, Product};
 use crate::models::types::{OrderType, Side, TimeInForceType};
@@ -122,6 +126,76 @@ impl OrderBook {
                     }
                 }
             },
+        };
+    }
+
+    pub fn is_order_will_full_match(&self, order: Order) -> bool {
+        let mut taker_order = BookOrder::new_book_order(order);
+        match taker_order.r#type {
+            OrderType::OrderTypeMarket => {
+                taker_order.price = match taker_order.side {
+                    Side::SideBuy => Decimal::MAX,
+                    Side::SideSell => Decimal::ZERO,
+                }
+            }
+            _ => {}
+        }
+
+        match taker_order.side {
+            Side::SideBuy => {
+                for (k, v) in &self.ask_depths.queue {
+                    let maker_order = self.ask_depths.orders.get(v).unwrap();
+                    match taker_order.r#type {
+                        OrderType::OrderTypeLimit => {
+                            if taker_order.size.is_zero() {
+                                break;
+                            }
+                            let size = Decimal::min(
+                                taker_order.size,
+                                maker_order.size,
+                            );
+                            taker_order.size = taker_order.size.sub(size);
+                        }
+                        OrderType::OrderTypeMarket => {
+                            if taker_order.size.is_zero() {
+                                break;
+                            }
+                            let taker_size = taker_order.funds
+                                .div(maker_order.price)
+                                .trunc_with_scale(self.product.base_scale as u32);
+                            let size = Decimal::min(
+                                taker_size,
+                                maker_order.size,
+                            );
+                            let funds = size.mul(maker_order.price);
+                            taker_order.funds = taker_order.funds.sub(funds);
+                        }
+                    }
+                }
+            }
+            Side::SideSell => {
+                for (k, v) in &self.bid_depths.queue {
+                    let maker_order = self.bid_depths.orders.get(v).unwrap();
+                    if taker_order.size.is_zero() {
+                        break;
+                    }
+                    let size = Decimal::min(
+                        taker_order.size,
+                        maker_order.size,
+                    );
+                    taker_order.size = taker_order.size.sub(size);
+                }
+            }
+        }
+
+        return match taker_order.r#type {
+            OrderType::OrderTypeLimit => {
+                match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+                    Greater => { false }
+                    _ => { true }
+                }
+            }
+            _ => { true }
         };
     }
 }
