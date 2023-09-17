@@ -9,7 +9,7 @@ use crate::models::types::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Product {
-    pub id: u64,
+    pub id: String,
     #[serde(with = "chrono::serde::ts_nanoseconds")]
     pub created_at: DateTime<Utc>,
     #[serde(with = "chrono::serde::ts_nanoseconds")]

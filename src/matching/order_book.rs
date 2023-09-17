@@ -1,19 +1,20 @@
-use std::cmp::Ordering;
-use std::cmp::Ordering::Greater;
 // #[macro_use]
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
+use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc, PriceOrderIdKeyOrdering};
 use rust_decimal::Decimal;
 
+use crate::matching::log::{new_done_log, new_match_log, Log};
+use rust_decimal::prelude::Zero;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
-use rust_decimal::prelude::Zero;
+use std::cmp::Ordering;
 
 use crate::models::models::{Order, Product};
-use crate::models::types::{OrderType, Side, TimeInForceType};
+use crate::models::types::{OrderType, Side, TimeInForceType, DONE_REASON_FILLED};
+use crate::utils::error::CustomError;
 use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
@@ -54,15 +55,47 @@ pub struct OrderBookSnapshot {
     pub order_id_window: Window,
 }
 
-pub struct AskDepth {
+pub struct Depth<T: PriceOrderIdKeyOrdering + Ord> {
     pub orders: HashMap<u64, BookOrder>,
-    pub queue: BTreeMap<PriceOrderIdKeyAsc, u64>,
+    pub queue: BTreeMap<T, u64>,
 }
 
-pub struct BidDepth {
-    pub orders: HashMap<u64, BookOrder>,
-    pub queue: BTreeMap<PriceOrderIdKeyDesc, u64>,
+impl<T: PriceOrderIdKeyOrdering + Ord> Depth<T> {
+    pub fn add(&mut self, order: &BookOrder) {
+        self.orders.insert(order.order_id, order.clone());
+        self.queue
+            .insert(T::new(&order.price, order.order_id), order.order_id);
+    }
+
+    pub fn decr_size(&mut self, order_id: u64, size: Decimal) -> Option<CustomError> {
+        return match self.orders.get(&order_id) {
+            Some(order) => {
+                let mut order = order.clone();
+                match Decimal::cmp(&order.size, &size) {
+                    Ordering::Less => Some(CustomError::from_string(format!(
+                        "order {} Size {} less than {}",
+                        order_id, order.size, size
+                    ))),
+                    _ => {
+                        order.size = order.size.sub(size);
+                        if order.size.is_zero() {
+                            self.orders.remove(&order_id);
+                            self.queue.remove(&T::new(&order.price, order.order_id));
+                        }
+                        None
+                    }
+                }
+            }
+            None => Some(CustomError::from_string(format!(
+                "order {} not found on book",
+                order_id
+            ))),
+        };
+    }
 }
+
+pub type AskDepth = Depth<PriceOrderIdKeyAsc>;
+pub type BidDepth = Depth<PriceOrderIdKeyDesc>;
 
 pub struct OrderBook {
     pub product: Product,
@@ -150,23 +183,18 @@ impl OrderBook {
                             if taker_order.size.is_zero() {
                                 break;
                             }
-                            let size = Decimal::min(
-                                taker_order.size,
-                                maker_order.size,
-                            );
+                            let size = Decimal::min(taker_order.size, maker_order.size);
                             taker_order.size = taker_order.size.sub(size);
                         }
                         OrderType::OrderTypeMarket => {
                             if taker_order.size.is_zero() {
                                 break;
                             }
-                            let taker_size = taker_order.funds
+                            let taker_size = taker_order
+                                .funds
                                 .div(maker_order.price)
                                 .trunc_with_scale(self.product.base_scale as u32);
-                            let size = Decimal::min(
-                                taker_size,
-                                maker_order.size,
-                            );
+                            let size = Decimal::min(taker_size, maker_order.size);
                             let funds = size.mul(maker_order.price);
                             taker_order.funds = taker_order.funds.sub(funds);
                         }
@@ -179,23 +207,28 @@ impl OrderBook {
                     if taker_order.size.is_zero() {
                         break;
                     }
-                    let size = Decimal::min(
-                        taker_order.size,
-                        maker_order.size,
-                    );
+                    let size = Decimal::min(taker_order.size, maker_order.size);
                     taker_order.size = taker_order.size.sub(size);
                 }
             }
         }
 
         return match taker_order.r#type {
-            OrderType::OrderTypeLimit => {
-                match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
-                    Greater => { false }
-                    _ => { true }
-                }
-            }
-            _ => { true }
+            OrderType::OrderTypeLimit => match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+                Ordering::Greater => false,
+                _ => true,
+            },
+            _ => true,
         };
+    }
+
+    pub fn next_log_seq(&mut self) -> u64 {
+        self.log_seq += 1;
+        self.log_seq
+    }
+
+    pub fn next_trade_seq(&mut self) -> u64 {
+        self.trade_seq += 1;
+        self.trade_seq
     }
 }

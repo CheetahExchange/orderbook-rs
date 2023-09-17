@@ -32,6 +32,12 @@ pub enum OrderStatus {
     OrderStatusFilled,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum DoneReason {
+    DoneReasonFilled,
+    DoneReasonCancelled,
+}
+
 pub const ORDER_TYPE_LIMIT: OrderType = OrderType::OrderTypeLimit;
 pub const ORDER_TYPE_MARKET: OrderType = OrderType::OrderTypeMarket;
 
@@ -49,3 +55,6 @@ pub const ORDER_STATUS_CANCELLING: OrderStatus = OrderStatus::OrderStatusCancell
 pub const ORDER_STATUS_CANCELLED: OrderStatus = OrderStatus::OrderStatusCancelled;
 pub const ORDER_STATUS_PARTIAL: OrderStatus = OrderStatus::OrderStatusPartial;
 pub const ORDER_STATUS_FILLED: OrderStatus = OrderStatus::OrderStatusFilled;
+
+pub const DONE_REASON_FILLED: DoneReason = DoneReason::DoneReasonFilled;
+pub const DONE_REASON_CANCELLED: DoneReason = DoneReason::DoneReasonCancelled;

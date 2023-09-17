@@ -1,9 +1,22 @@
 use rust_decimal::Decimal;
 use std::cmp::Ordering;
 
+pub trait PriceOrderIdKeyOrdering {
+    fn new(price: &Decimal, order_id: u64) -> Self;
+}
+
 pub struct PriceOrderIdKeyAsc {
     pub price: Decimal,
     pub order_id: u64,
+}
+
+impl PriceOrderIdKeyOrdering for PriceOrderIdKeyAsc {
+    fn new(price: &Decimal, order_id: u64) -> Self {
+        PriceOrderIdKeyAsc {
+            price: price.clone(),
+            order_id,
+        }
+    }
 }
 
 impl Eq for PriceOrderIdKeyAsc {}
@@ -37,6 +50,15 @@ impl Ord for PriceOrderIdKeyAsc {
 pub struct PriceOrderIdKeyDesc {
     pub price: Decimal,
     pub order_id: u64,
+}
+
+impl PriceOrderIdKeyOrdering for PriceOrderIdKeyDesc {
+    fn new(price: &Decimal, order_id: u64) -> Self {
+        PriceOrderIdKeyDesc {
+            price: price.clone(),
+            order_id,
+        }
+    }
 }
 
 impl Eq for PriceOrderIdKeyDesc {}
