@@ -83,8 +83,8 @@ pub fn new_done_log(
     log_seq: u64,
     product_id: &str,
     order: &BookOrder,
-    remaining_size: Decimal,
-    reason: DoneReason,
+    remaining_size: &Decimal,
+    reason: &DoneReason,
 ) -> DoneLog {
     DoneLog {
         base: Base {
@@ -96,8 +96,8 @@ pub fn new_done_log(
         order_id: order.order_id,
         user_id: order.user_id,
         price: order.price,
-        remaining_size,
-        reason,
+        remaining_size: remaining_size.clone(),
+        reason: reason.clone(),
         side: order.side.clone(),
         time_in_force: order.time_in_force.clone(),
     }
@@ -130,8 +130,8 @@ pub fn new_match_log(
     trade_seq: u64,
     taker_order: &BookOrder,
     maker_order: &BookOrder,
-    price: Decimal,
-    size: Decimal,
+    price: &Decimal,
+    size: &Decimal,
 ) -> MatchLog {
     MatchLog {
         base: Base {
@@ -146,8 +146,8 @@ pub fn new_match_log(
         taker_user_id: taker_order.user_id,
         maker_user_id: maker_order.user_id,
         side: maker_order.side.clone(),
-        price,
-        size,
+        price: price.clone(),
+        size: size.clone(),
         taker_time_in_force: taker_order.time_in_force.clone(),
         maker_time_in_force: maker_order.time_in_force.clone(),
     }

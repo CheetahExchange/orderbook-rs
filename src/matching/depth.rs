@@ -18,11 +18,11 @@ impl<T: PriceOrderIdKeyOrdering + Ord> Depth<T> {
             .insert(T::new(&order.price, order.order_id), order.order_id);
     }
 
-    pub fn decr_size(&mut self, order_id: u64, size: Decimal) -> Option<CustomError> {
+    pub fn decr_size(&mut self, order_id: u64, size: &Decimal) -> Option<CustomError> {
         return match self.orders.get(&order_id) {
             Some(order) => {
                 let mut order = order.clone();
-                match Decimal::cmp(&order.size, &size) {
+                match Decimal::cmp(&order.size, size) {
                     Ordering::Less => Some(CustomError::from_string(format!(
                         "order {} Size {} less than {}",
                         order_id, order.size, size
