@@ -372,8 +372,8 @@ impl OrderBook {
         logs
     }
 
-    pub fn cancel_order(&mut self, order: &Order) -> Vec<DoneLog> {
-        let mut logs: Vec<DoneLog> = Vec::new();
+    pub fn cancel_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
+        let mut logs: Vec<Box<dyn Log>> = Vec::new();
         let _ = self.order_id_window.put(order.id);
         let mut f = false;
         let mut book_order = BookOrder::default();
@@ -419,13 +419,13 @@ impl OrderBook {
                 &book_order.size,
                 &DONE_REASON_CANCELLED,
             );
-            logs.push(done_log);
+            logs.push(Box::new(done_log));
         }
         logs
     }
 
-    pub fn nullify_order(&mut self, order: &Order) -> Vec<DoneLog> {
-        let mut logs: Vec<DoneLog> = Vec::new();
+    pub fn nullify_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
+        let mut logs: Vec<Box<dyn Log>> = Vec::new();
         let _ = self.order_id_window.put(order.id);
 
         let book_order = BookOrder::new_book_order(order);
@@ -436,7 +436,7 @@ impl OrderBook {
             &order.size,
             &DONE_REASON_CANCELLED,
         );
-        logs.push(done_log);
+        logs.push(Box::new(done_log));
         logs
     }
 
