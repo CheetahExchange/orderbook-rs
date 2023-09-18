@@ -1,4 +1,5 @@
 // #[macro_use]
+use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::log::Log;
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,7 @@ use std::fmt::Display;
 use tokio::select;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time::{sleep, Duration};
 
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
 use crate::matching::redis_snapshot::RedisSnapshotStore;
@@ -14,7 +16,7 @@ use crate::models::models::{Order, Product};
 use crate::models::types::{OrderStatus, TimeInForceType};
 use crate::utils::error::CustomError;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Snapshot {
     pub order_book_snapshot: OrderBookSnapshot,
     pub order_offset: u64,
@@ -93,9 +95,7 @@ impl Engine {
                         .send(OffsetOrder {
                             offset: offset as u64,
                             order: o,
-                        })
-                        .await
-                    {
+                        }).await {
                         Ok(_) => {}
                         Err(e) => {
                             println!("{}", e);
@@ -186,6 +186,126 @@ impl Engine {
                             continue;
                         }
                     }
+                }
+            }
+        }
+    }
+
+    pub async fn run_committer(
+        &mut self,
+        log_rx: &mut Receiver<Box<dyn Log>>,
+        snapshot_approve_req_rx: &mut Receiver<Snapshot>,
+        snapshot_tx: Sender<Snapshot>,
+        log_store: &mut KafkaLogStore,
+    ) {
+        let mut seq = self.order_book.log_seq;
+        let mut pending: Option<Snapshot> = None;
+        let mut logs: Vec<Box<dyn Log>> = Vec::new();
+
+        loop {
+            select! {
+                Some(log) = log_rx.recv() => {
+                    if log.get_seq() <= seq {
+                        println!("discard log seq={}", seq);
+                        continue;
+                    }
+                    seq = log.get_seq();
+                    logs.push(log);
+
+                    for _ in 0..100 {
+                        match log_rx.try_recv() {
+                            Ok(log) => {
+                                seq = log.get_seq();
+                                logs.push(log);
+                            }
+                            Err(e) => {
+                                break;
+                            }
+                        }
+                    }
+
+                    match log_store.store(&logs).await {
+                        Some(e) => { panic!("{}", e);}
+                        None => {}
+                    }
+                    logs.clear();
+
+                    match &pending {
+                        Some(p) => {
+                            if seq >= p.order_book_snapshot.log_seq {
+                                match snapshot_tx.send(p.clone()).await{
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        println!("{}", e);
+                                        continue;
+                                    }
+                                };
+                                pending = None;
+                            }
+                        },
+                        None => {}
+                    }
+                },
+                Some(snapshot) = snapshot_approve_req_rx.recv() => {
+                    if seq >= snapshot.order_book_snapshot.log_seq {
+                        match snapshot_tx.send(snapshot.clone()).await{
+                            Ok(_) => {},
+                            Err(e) => {
+                                println!("{}", e);
+                                continue;
+                            }
+                        };
+                        pending = None;
+                        continue;
+                    }
+
+                    match &pending {
+                        Some(p) => {
+                            println!("discard snapshot request (seq={}), new one (seq={}) received",
+                            p.order_book_snapshot.log_seq, snapshot.order_book_snapshot.log_seq);
+                        },
+                        None => {}
+                    }
+                    pending = Some(snapshot);
+                }
+            }
+        }
+    }
+
+    pub async fn run_snapshots(
+        &mut self,
+        snapshot_req_tx: Sender<Snapshot>,
+        snapshot_rx: &mut Receiver<Snapshot>,
+        snapshot_store: &mut RedisSnapshotStore,
+    ) {
+        let mut order_offset = self.order_offset;
+
+        loop {
+            select! {
+                _ = sleep(Duration::from_secs(30)) => {
+                    match snapshot_req_tx.send(Snapshot{
+                        order_book_snapshot:OrderBookSnapshot::default(),
+                        order_offset: order_offset,
+                    }).await{
+                        Ok(_) => {},
+                        Err(e) => {
+                            println!("{}", e);
+                            continue;
+                        }
+                    };
+                },
+                Some(snapshot) = snapshot_rx.recv() => {
+                    match snapshot_store.store(&snapshot).await {
+                        Some(e) => {
+                            println!("store snapshot failed: {}", e);
+                            continue;
+                        },
+                        None => {}
+                    }
+                    println!("new snapshot stored :product={} OrderOffset={} LogSeq={}",
+                    self.product_id, snapshot.order_offset, snapshot.order_book_snapshot.log_seq);
+
+                    order_offset = snapshot.order_offset;
                 }
             }
         }

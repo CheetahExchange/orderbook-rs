@@ -5,7 +5,7 @@ use serde_json;
 use crate::utils::bitmap::Bitmap;
 use crate::utils::error::CustomError;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Window {
     pub min: u64,
     pub max: u64,

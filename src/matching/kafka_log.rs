@@ -1,7 +1,11 @@
 use crate::utils::kafka::{new_kafka_producer, DefaultProducer};
+use std::ops::Deref;
 
+use crate::matching::log::Log;
 use crate::utils::error::CustomError;
+use rdkafka::producer::FutureRecord;
 use std::result::Result;
+use std::time::Duration;
 
 const TOPIC_BOOK_MESSAGE_PREFIX: &str = "matching_order_";
 
@@ -23,5 +27,25 @@ impl KafkaLogStore {
             }),
             Err(e) => Err(CustomError::new(&e)),
         };
+    }
+
+    pub async fn store(&self, logs: &Vec<Box<dyn Log>>) -> Option<CustomError> {
+        for log in logs {
+            match serde_json::to_string(log) {
+                Ok(s) => {
+                    _ = self
+                        .log_producer
+                        .send(
+                            FutureRecord::to(&self.topic).payload(&s).key(""),
+                            Duration::from_secs(5),
+                        )
+                        .await;
+                }
+                Err(e) => {
+                    return Some(CustomError::new(&e));
+                }
+            }
+        }
+        None
     }
 }

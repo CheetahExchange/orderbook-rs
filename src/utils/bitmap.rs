@@ -9,7 +9,7 @@ lazy_static! {
     static ref TB: Vec<u8> = vec![254, 253, 251, 247, 239, 223, 191, 127];
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Bitmap {
     data: Vec<u8>,
 }

@@ -1,4 +1,5 @@
 // #[macro_use]
+use erased_serde::serialize_trait_object;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
@@ -14,9 +15,11 @@ pub enum LogType {
     LogTypeDone,
 }
 
-pub trait Log {
-    fn get_seq(self) -> u64;
+pub trait Log: erased_serde::Serialize {
+    fn get_seq(&self) -> u64;
 }
+
+serialize_trait_object!(Log);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Base {
@@ -39,7 +42,7 @@ pub struct OpenLog {
 }
 
 impl Log for OpenLog {
-    fn get_seq(self) -> u64 {
+    fn get_seq(&self) -> u64 {
         self.base.sequence
     }
 }
@@ -74,7 +77,7 @@ pub struct DoneLog {
 }
 
 impl Log for DoneLog {
-    fn get_seq(self) -> u64 {
+    fn get_seq(&self) -> u64 {
         self.base.sequence
     }
 }
@@ -119,7 +122,7 @@ pub struct MatchLog {
 }
 
 impl Log for MatchLog {
-    fn get_seq(self) -> u64 {
+    fn get_seq(&self) -> u64 {
         self.base.sequence
     }
 }

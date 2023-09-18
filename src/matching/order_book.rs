@@ -49,7 +49,7 @@ impl BookOrder {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct OrderBookSnapshot {
     pub product_id: String,
     pub orders: Vec<BookOrder>,
