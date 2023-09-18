@@ -36,7 +36,7 @@ impl KafkaOrderReader {
     }
 
     pub fn set_offset(&mut self, offset: i64, time_out: u64) -> Option<CustomError> {
-        let offset = if offset == -1 as i64 {
+        let offset = if offset == -1i64 {
             Offset::End
         } else {
             Offset::Offset(offset)
@@ -63,13 +63,19 @@ impl KafkaOrderReader {
         };
     }
 
-    pub async fn fetch_order(&mut self) -> (i64, Option<Order>) {
-        let (offset, payload, _) = self.fetch_message().await;
+    pub async fn fetch_order(&mut self) -> (i64, Option<Order>, Option<CustomError>) {
+        let (offset, payload, err) = self.fetch_message().await;
+        match err {
+            Some(e) => {
+                return (0, None, Some(e));
+            }
+            _ => {}
+        }
         return match payload {
-            None => (0, None),
+            None => (0, None, None),
             Some(v) => match serde_json::from_slice(&v) {
-                Err(_) => (0, None),
-                Ok(order) => (offset, order),
+                Err(e) => (0, None, Some(CustomError::new(&e))),
+                Ok(order) => (offset, order, None),
             },
         };
     }
