@@ -440,6 +440,45 @@ impl OrderBook {
         logs
     }
 
+    pub fn snapshot(&self) -> OrderBookSnapshot {
+        let mut snapshot = OrderBookSnapshot {
+            product_id: self.product.id.clone(),
+            orders: Vec::new(),
+            trade_seq: self.trade_seq,
+            log_seq: self.log_seq,
+            order_id_window: self.order_id_window.clone(),
+        };
+        snapshot
+            .orders
+            .reserve(self.ask_depths.orders.len() + self.bid_depths.orders.len());
+        for (_, o) in &self.ask_depths.orders {
+            snapshot.orders.push(o.clone());
+        }
+        for (_, o) in &self.bid_depths.orders {
+            snapshot.orders.push(o.clone());
+        }
+        snapshot
+    }
+
+    pub fn restore(&mut self, snapshot: &OrderBookSnapshot) {
+        self.log_seq = snapshot.log_seq;
+        self.trade_seq = snapshot.trade_seq;
+        self.order_id_window = snapshot.order_id_window.clone();
+        if self.order_id_window.cap == 0 {
+            self.order_id_window = Window::new(0, ORDER_ID_WINDOW_CAP);
+        }
+        for o in &snapshot.orders {
+            match o.side {
+                Side::SideBuy => {
+                    self.bid_depths.add(o);
+                }
+                Side::SideSell => {
+                    self.ask_depths.add(o);
+                }
+            }
+        }
+    }
+
     pub fn next_log_seq(&mut self) -> u64 {
         self.log_seq += 1;
         self.log_seq
