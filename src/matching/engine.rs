@@ -1,14 +1,17 @@
 // #[macro_use]
 use crate::matching::kafka_order::KafkaOrderReader;
+use crate::matching::log::Log;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::fmt::Display;
+use tokio::select;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use std::fmt::Display;
 
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
 use crate::matching::redis_snapshot::RedisSnapshotStore;
 use crate::models::models::{Order, Product};
+use crate::models::types::{OrderStatus, TimeInForceType};
 use crate::utils::error::CustomError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -93,6 +96,90 @@ impl Engine {
                         })
                         .await
                     {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("{}", e);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn run_applier(
+        &mut self,
+        order_rx: &mut Receiver<OffsetOrder>,
+        log_tx: &Sender<Box<dyn Log>>,
+        snapshot_req_rx: &mut Receiver<Snapshot>,
+        snapshot_approve_req_tx: &Sender<Snapshot>,
+    ) {
+        let mut order_offset = 0u64;
+        loop {
+            select! {
+                Some(offset_order) = order_rx.recv() => {
+                    let mut logs: Vec<Box<dyn Log>> = Vec::new();
+                    match offset_order.order.status {
+                        OrderStatus::OrderStatusCancelling => {
+                            logs = self.order_book.cancel_order(&offset_order.order);
+                        }
+                        _ => {
+                            match offset_order.order.time_in_force {
+                                TimeInForceType::ImmediateOrCancel => {
+                                    logs = self.order_book.apply_order(&offset_order.order);
+                                    let ioc_logs = self.order_book.cancel_order(&offset_order.order);
+                                    if !ioc_logs.is_empty() {
+                                        logs.extend(ioc_logs);
+                                    }
+                                },
+                                TimeInForceType::GoodTillCrossing => {
+                                    if self.order_book.is_order_will_not_match(&offset_order.order) {
+                                        logs = self.order_book.apply_order(&offset_order.order);
+                                    } else {
+                                        logs = self.order_book.nullify_order(&offset_order.order);
+                                    }
+                                },
+                                TimeInForceType::FillOrKill => {
+                                 if self.order_book.is_order_will_full_match(&offset_order.order) {
+                                        logs = self.order_book.apply_order(&offset_order.order);
+                                    } else {
+                                        logs = self.order_book.nullify_order(&offset_order.order);
+                                    }
+                                },
+                                TimeInForceType::GoodTillCanceled => {
+                                    logs = self.order_book.apply_order(&offset_order.order);
+                                },
+                                _ => {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+
+                    for log in logs {
+                        match log_tx.send(log).await{
+                            Ok(_) => {}
+                            Err(e) => {
+                                println!("{}", e);
+                                continue;
+                            }
+                        }
+                    }
+
+                    order_offset = offset_order.offset;
+                },
+                Some(mut snapshot) = snapshot_req_rx.recv() => {
+                    let delta: i64 = order_offset as i64 - snapshot.order_offset as i64;
+                    if delta <= 1000 {
+                        continue;
+                    }
+
+                    println!("should take snapshot: {} {}-[{}]-{}->",
+                        self.product_id, snapshot.order_offset, delta, order_offset);
+                    snapshot.order_book_snapshot = self.order_book.snapshot();
+                    snapshot.order_offset = order_offset;
+
+                    match snapshot_approve_req_tx.send(snapshot).await{
                         Ok(_) => {}
                         Err(e) => {
                             println!("{}", e);
