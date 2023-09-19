@@ -5,7 +5,7 @@ use crate::matching::log::Log;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fmt::Display;
-use std::future::join;
+use std::future::{join, Future};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
