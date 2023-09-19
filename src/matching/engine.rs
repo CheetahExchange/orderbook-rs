@@ -1,5 +1,3 @@
-use std::future::Future;
-// #[macro_use]
 use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::log::Log;

@@ -1,4 +1,3 @@
-// #[macro_use]
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 

@@ -1,4 +1,3 @@
-// #[macro_use]
 use serde::{Deserialize, Serialize};
 
 use crate::utils::bitmap::Bitmap;
