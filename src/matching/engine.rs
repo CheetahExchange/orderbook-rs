@@ -5,10 +5,13 @@ use crate::matching::log::Log;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fmt::Display;
-use tokio::select;
+use std::future::join;
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use tokio::time::{sleep, Duration};
+use tokio::{select, spawn};
 
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
 use crate::matching::redis_snapshot::RedisSnapshotStore;
@@ -56,17 +59,59 @@ impl Engine {
         engine
     }
 
+    pub async fn start(
+        &mut self,
+        snapshot_store: &mut RedisSnapshotStore,
+        order_reader: &mut KafkaOrderReader,
+        log_store: &mut KafkaLogStore,
+    ) {
+        let (log_tx, mut log_rx) = mpsc::channel::<Box<dyn Log>>(10000);
+        let (order_tx, mut order_rx) = mpsc::channel::<OffsetOrder>(10000);
+        let (snapshot_req_tx, mut snapshot_req_rx) = mpsc::channel::<Snapshot>(32);
+        let (snapshot_approve_req_tx, mut snapshot_approve_req_rx) = mpsc::channel::<Snapshot>(32);
+        let (snapshot_tx, mut snapshot_rx) = mpsc::channel::<Snapshot>(32);
+
+        let product_id = self.product_id.clone();
+        let order_offset = self.order_offset;
+        let log_seq = self.order_book.log_seq;
+
+        let fut1 = Engine::run_fetcher(order_offset, order_reader, order_tx);
+        let fut2 = Engine::run_applier(
+            self,
+            order_rx,
+            log_tx,
+            snapshot_req_rx,
+            snapshot_approve_req_tx,
+        );
+        let fut3 = Engine::run_committer(
+            log_seq,
+            log_rx,
+            snapshot_approve_req_rx,
+            snapshot_tx,
+            log_store,
+        );
+        let fut4 = Engine::run_snapshots(
+            &product_id,
+            order_offset,
+            snapshot_req_tx,
+            snapshot_rx,
+            snapshot_store,
+        );
+
+        join!(fut1, fut2, fut3, fut4);
+    }
+
     pub fn restore(&mut self, snapshot: &Snapshot) {
         self.order_offset = snapshot.order_offset;
         self.order_book.restore(&snapshot.order_book_snapshot);
     }
 
     pub async fn run_fetcher(
-        &self,
+        order_offset: u64,
         order_reader: &mut KafkaOrderReader,
-        order_tx: &Sender<OffsetOrder>,
+        order_tx: Sender<OffsetOrder>,
     ) {
-        let mut offset = self.order_offset;
+        let mut offset = order_offset;
         if offset > 0 {
             offset += 1;
         }
@@ -95,7 +140,9 @@ impl Engine {
                         .send(OffsetOrder {
                             offset: offset as u64,
                             order: o,
-                        }).await {
+                        })
+                        .await
+                    {
                         Ok(_) => {}
                         Err(e) => {
                             println!("{}", e);
@@ -109,12 +156,15 @@ impl Engine {
 
     pub async fn run_applier(
         &mut self,
-        order_rx: &mut Receiver<OffsetOrder>,
-        log_tx: &Sender<Box<dyn Log>>,
-        snapshot_req_rx: &mut Receiver<Snapshot>,
-        snapshot_approve_req_tx: &Sender<Snapshot>,
+        order_rx: Receiver<OffsetOrder>,
+        log_tx: Sender<Box<dyn Log>>,
+        snapshot_req_rx: Receiver<Snapshot>,
+        snapshot_approve_req_tx: Sender<Snapshot>,
     ) {
         let mut order_offset = 0u64;
+        let mut order_rx = order_rx;
+        let mut snapshot_req_rx = snapshot_req_rx;
+
         loop {
             select! {
                 Some(offset_order) = order_rx.recv() => {
@@ -192,15 +242,17 @@ impl Engine {
     }
 
     pub async fn run_committer(
-        &mut self,
-        log_rx: &mut Receiver<Box<dyn Log>>,
-        snapshot_approve_req_rx: &mut Receiver<Snapshot>,
+        log_seq: u64,
+        log_rx: Receiver<Box<dyn Log>>,
+        snapshot_approve_req_rx: Receiver<Snapshot>,
         snapshot_tx: Sender<Snapshot>,
         log_store: &mut KafkaLogStore,
     ) {
-        let mut seq = self.order_book.log_seq;
+        let mut seq = log_seq;
         let mut pending: Option<Snapshot> = None;
         let mut logs: Vec<Box<dyn Log>> = Vec::new();
+        let mut snapshot_approve_req_rx = snapshot_approve_req_rx;
+        let mut log_rx = log_rx;
 
         loop {
             select! {
@@ -273,13 +325,14 @@ impl Engine {
     }
 
     pub async fn run_snapshots(
-        &mut self,
+        product_id: &str,
+        order_offset: u64,
         snapshot_req_tx: Sender<Snapshot>,
-        snapshot_rx: &mut Receiver<Snapshot>,
+        snapshot_rx: Receiver<Snapshot>,
         snapshot_store: &mut RedisSnapshotStore,
     ) {
-        let mut order_offset = self.order_offset;
-
+        let mut order_offset = order_offset;
+        let mut snapshot_rx = snapshot_rx;
         loop {
             select! {
                 _ = sleep(Duration::from_secs(30)) => {
@@ -303,7 +356,7 @@ impl Engine {
                         None => {}
                     }
                     println!("new snapshot stored :product={} OrderOffset={} LogSeq={}",
-                    self.product_id, snapshot.order_offset, snapshot.order_book_snapshot.log_seq);
+                    product_id, snapshot.order_offset, snapshot.order_book_snapshot.log_seq);
 
                     order_offset = snapshot.order_offset;
                 }
