@@ -1,12 +1,10 @@
 // #[macro_use]
-use serde::{Deserialize, Serialize};
-use serde_json;
-
-use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc, PriceOrderIdKeyOrdering};
+use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 use crate::matching::depth::{AskDepth, BidDepth};
-use crate::matching::log::{new_done_log, new_match_log, new_open_log, DoneLog, Log};
+use crate::matching::log::{new_done_log, new_match_log, new_open_log, Log};
 use rust_decimal::prelude::Zero;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -17,7 +15,6 @@ use crate::models::models::{Order, Product};
 use crate::models::types::{
     OrderType, Side, TimeInForceType, DONE_REASON_CANCELLED, DONE_REASON_FILLED,
 };
-use crate::utils::error::CustomError;
 use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
@@ -100,7 +97,7 @@ impl OrderBook {
         return match taker_order.side {
             Side::SideBuy => match self.ask_depths.queue.first_key_value() {
                 None => true,
-                Some((k, v)) => {
+                Some((_k, v)) => {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
                     if taker_order.price.lt(&maker_order.price) {
                         true
@@ -111,7 +108,7 @@ impl OrderBook {
             },
             Side::SideSell => match self.bid_depths.queue.first_key_value() {
                 None => true,
-                Some((k, v)) => {
+                Some((_k, v)) => {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
                     if taker_order.price.gt(&maker_order.price) {
                         true
@@ -137,7 +134,7 @@ impl OrderBook {
 
         match taker_order.side {
             Side::SideBuy => {
-                for (k, v) in &self.ask_depths.queue {
+                for (_k, v) in &self.ask_depths.queue {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
                     match taker_order.r#type {
                         OrderType::OrderTypeLimit => {
@@ -163,7 +160,7 @@ impl OrderBook {
                 }
             }
             Side::SideSell => {
-                for (k, v) in &self.bid_depths.queue {
+                for (_k, v) in &self.bid_depths.queue {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
                     if taker_order.size.is_zero() {
                         break;
@@ -186,7 +183,7 @@ impl OrderBook {
     pub fn apply_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
         let mut logs: Vec<Box<dyn Log>> = Vec::new();
         match self.order_id_window.put(order.id) {
-            Some(e) => {
+            Some(_e) => {
                 return logs;
             }
             _ => {}
@@ -205,7 +202,7 @@ impl OrderBook {
 
         match taker_order.side {
             Side::SideBuy => {
-                for (k, v) in &(self.ask_depths.queue.clone()) {
+                for (_k, v) in &(self.ask_depths.queue.clone()) {
                     let maker_order = self.ask_depths.orders.get(v).unwrap().clone();
                     let mut size = Decimal::default();
                     match taker_order.r#type {
@@ -264,7 +261,7 @@ impl OrderBook {
                 }
             }
             Side::SideSell => {
-                for (k, v) in &(self.bid_depths.queue.clone()) {
+                for (_k, v) in &(self.bid_depths.queue.clone()) {
                     let maker_order = self.bid_depths.orders.get(v).unwrap().clone();
                     if taker_order.size.is_zero() {
                         break;

@@ -1,16 +1,13 @@
-use crate::utils::kafka::new_kafka_consumer;
-use crate::utils::kafka::DefaultConsumer;
-
-use crate::utils::error::CustomError;
-use std::borrow::Borrow;
-use std::result::Result;
-
-use crate::models::models::Order;
 use rdkafka::consumer::Consumer;
-use rdkafka::topic_partition_list::Offset::OffsetTail;
 use rdkafka::util::Timeout;
 use rdkafka::{Message, Offset};
+use std::result::Result;
 use std::time::Duration;
+
+use crate::models::models::Order;
+use crate::utils::error::CustomError;
+use crate::utils::kafka::new_kafka_consumer;
+use crate::utils::kafka::DefaultConsumer;
 
 const TOPIC_ORDER_PREFIX: &str = "matching_order_";
 

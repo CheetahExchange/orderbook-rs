@@ -1,6 +1,5 @@
 // #[macro_use]
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum OrderType {

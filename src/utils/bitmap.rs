@@ -1,6 +1,5 @@
 // #[macro_use]
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use lazy_static::lazy_static;
 

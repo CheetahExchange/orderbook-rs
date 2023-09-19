@@ -1,6 +1,5 @@
 // #[macro_use]
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use crate::utils::bitmap::Bitmap;
 use crate::utils::error::CustomError;

@@ -1,12 +1,12 @@
 // #[macro_use]
 use erased_serde::serialize_trait_object;
 use serde::{Deserialize, Serialize};
-use serde_json;
+
+use chrono::prelude::*;
+use rust_decimal::Decimal;
 
 use crate::matching::order_book::BookOrder;
 use crate::models::types::{DoneReason, Side, TimeInForceType};
-use chrono::prelude::*;
-use rust_decimal::Decimal;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LogType {

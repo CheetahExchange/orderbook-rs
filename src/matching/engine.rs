@@ -1,23 +1,18 @@
+use std::future::Future;
 // #[macro_use]
 use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::log::Log;
 use serde::{Deserialize, Serialize};
-use serde_json;
-use std::fmt::Display;
-use std::future::{join, Future};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task::JoinHandle;
 use tokio::time::{sleep, Duration};
-use tokio::{select, spawn};
+use tokio::{join, select};
 
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
 use crate::matching::redis_snapshot::RedisSnapshotStore;
 use crate::models::models::{Order, Product};
 use crate::models::types::{OrderStatus, TimeInForceType};
-use crate::utils::error::CustomError;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Snapshot {
@@ -65,11 +60,11 @@ impl Engine {
         order_reader: &mut KafkaOrderReader,
         log_store: &mut KafkaLogStore,
     ) {
-        let (log_tx, mut log_rx) = mpsc::channel::<Box<dyn Log>>(10000);
-        let (order_tx, mut order_rx) = mpsc::channel::<OffsetOrder>(10000);
-        let (snapshot_req_tx, mut snapshot_req_rx) = mpsc::channel::<Snapshot>(32);
-        let (snapshot_approve_req_tx, mut snapshot_approve_req_rx) = mpsc::channel::<Snapshot>(32);
-        let (snapshot_tx, mut snapshot_rx) = mpsc::channel::<Snapshot>(32);
+        let (log_tx, log_rx) = mpsc::channel::<Box<dyn Log>>(10000);
+        let (order_tx, order_rx) = mpsc::channel::<OffsetOrder>(10000);
+        let (snapshot_req_tx, snapshot_req_rx) = mpsc::channel::<Snapshot>(32);
+        let (snapshot_approve_req_tx, snapshot_approve_req_rx) = mpsc::channel::<Snapshot>(32);
+        let (snapshot_tx, snapshot_rx) = mpsc::channel::<Snapshot>(32);
 
         let product_id = self.product_id.clone();
         let order_offset = self.order_offset;
@@ -168,7 +163,7 @@ impl Engine {
         loop {
             select! {
                 Some(offset_order) = order_rx.recv() => {
-                    let mut logs: Vec<Box<dyn Log>> = Vec::new();
+                    let mut logs= Vec::default();
                     match offset_order.order.status {
                         OrderStatus::OrderStatusCancelling => {
                             logs = self.order_book.cancel_order(&offset_order.order);
@@ -199,9 +194,6 @@ impl Engine {
                                 TimeInForceType::GoodTillCanceled => {
                                     logs = self.order_book.apply_order(&offset_order.order);
                                 },
-                                _ => {
-                                    continue;
-                                }
                             }
                         }
                     }
@@ -270,7 +262,7 @@ impl Engine {
                                 seq = log.get_seq();
                                 logs.push(log);
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 break;
                             }
                         }

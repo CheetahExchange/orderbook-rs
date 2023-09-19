@@ -5,7 +5,6 @@ use rdkafka::consumer::DefaultConsumerContext;
 use rdkafka::error::KafkaResult;
 use rdkafka::producer::DefaultProducerContext;
 use rdkafka::producer::FutureProducer;
-use std::borrow::Borrow;
 
 pub type DefaultConsumer = StreamConsumer<DefaultConsumerContext>;
 pub type DefaultProducer = FutureProducer<DefaultProducerContext>;

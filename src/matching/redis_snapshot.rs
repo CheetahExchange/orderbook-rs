@@ -1,18 +1,11 @@
-#![warn(rust_2018_idioms)]
-
-// #[macro_use]
-use serde::{Deserialize, Serialize};
-use serde_json;
-
-use mini_redis::client::{connect, Client};
-use std::result::Result;
-
 use bytes::Bytes;
+use mini_redis::client::Client;
+use serde_json;
+use std::result::Result;
 
 use crate::matching::engine::Snapshot;
 use crate::utils::error::CustomError;
 use crate::utils::redis::new_redis_client;
-use rdkafka::message::ToBytes;
 
 const TOPIC_SNAPSHOT_PREFIX: &str = "matching_snapshot_";
 

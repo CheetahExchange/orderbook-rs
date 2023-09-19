@@ -1,5 +1,3 @@
-#![warn(rust_2018_idioms)]
-
 use mini_redis::client::{connect, Client};
 use mini_redis::Result;
 
