@@ -24,9 +24,9 @@ async fn main() {
             .await
             .unwrap_or_else(|e| panic!("{}", e));
     let mut order_reader =
-        KafkaOrderReader::new_kafka_order_consumer(&["127.0.0.1:9092"], &product.id, 5)
+        KafkaOrderReader::new_kafka_order_consumer(&["127.0.0.1:9092"], &product.id, 30)
             .unwrap_or_else(|e| panic!("{}", e));
-    let mut log_store = KafkaLogStore::new_kafka_log_producer(&["127.0.0.1:9092"], &product.id, 5)
+    let mut log_store = KafkaLogStore::new_kafka_log_producer(&["127.0.0.1:9092"], &product.id, 30)
         .unwrap_or_else(|e| panic!("{}", e));
 
     let mut engine = Engine::new(&product, &mut snapshot_store).await;

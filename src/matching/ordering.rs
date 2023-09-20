@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-pub trait PriceOrderIdKeyOrdering {
+pub trait OrderingTrait {
     fn new(price: &Decimal, order_id: u64) -> Self;
 }
 
@@ -12,7 +12,7 @@ pub struct PriceOrderIdKeyAsc {
     pub order_id: u64,
 }
 
-impl PriceOrderIdKeyOrdering for PriceOrderIdKeyAsc {
+impl OrderingTrait for PriceOrderIdKeyAsc {
     fn new(price: &Decimal, order_id: u64) -> Self {
         PriceOrderIdKeyAsc {
             price: price.clone(),
@@ -55,7 +55,7 @@ pub struct PriceOrderIdKeyDesc {
     pub order_id: u64,
 }
 
-impl PriceOrderIdKeyOrdering for PriceOrderIdKeyDesc {
+impl OrderingTrait for PriceOrderIdKeyDesc {
     fn new(price: &Decimal, order_id: u64) -> Self {
         PriceOrderIdKeyDesc {
             price: price.clone(),

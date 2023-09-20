@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::matching::depth::{AskDepth, BidDepth};
-use crate::matching::log::{new_done_log, new_match_log, new_open_log, Log};
+use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
 use rust_decimal::prelude::Zero;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -179,8 +179,8 @@ impl OrderBook {
         };
     }
 
-    pub fn apply_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
-        let mut logs: Vec<Box<dyn Log>> = Vec::new();
+    pub fn apply_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
+        let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         match self.order_id_window.put(order.id) {
             Some(_e) => {
                 return logs;
@@ -368,8 +368,8 @@ impl OrderBook {
         logs
     }
 
-    pub fn cancel_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
-        let mut logs: Vec<Box<dyn Log>> = Vec::new();
+    pub fn cancel_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
+        let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let _ = self.order_id_window.put(order.id);
         let mut f = false;
         let mut book_order = BookOrder::default();
@@ -420,8 +420,8 @@ impl OrderBook {
         logs
     }
 
-    pub fn nullify_order(&mut self, order: &Order) -> Vec<Box<dyn Log>> {
-        let mut logs: Vec<Box<dyn Log>> = Vec::new();
+    pub fn nullify_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
+        let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let _ = self.order_id_window.put(order.id);
 
         let book_order = BookOrder::new_book_order(order);

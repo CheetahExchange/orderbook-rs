@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use mini_redis::client::Client;
-use rdkafka::message::ToBytes;
 use serde_json;
 use std::result::Result;
 
@@ -12,6 +11,7 @@ const TOPIC_SNAPSHOT_PREFIX: &str = "matching_snapshot_";
 
 pub struct RedisSnapshotStore {
     pub product_id: String,
+    pub snapshot_key: String,
     pub redis_client: Client,
 }
 
@@ -24,10 +24,11 @@ impl RedisSnapshotStore {
         return match new_redis_client(ip, port).await {
             Ok(c) => Ok(RedisSnapshotStore {
                 product_id: product_id.to_string(),
+                snapshot_key: String::from(&[TOPIC_SNAPSHOT_PREFIX, product_id].join("")),
                 redis_client: c,
             }),
             // redis connect err
-            Err(e) => Err(CustomError::new(&e)),
+            Err(e) => Err(CustomError::new(e.as_ref())),
         };
     }
 
@@ -36,15 +37,12 @@ impl RedisSnapshotStore {
             Ok(s) => {
                 match self
                     .redis_client
-                    .set(
-                        &*format!("{}{}", TOPIC_SNAPSHOT_PREFIX, self.product_id),
-                        Bytes::from(s.to_bytes()),
-                    )
+                    .set(self.snapshot_key.as_str(), Bytes::from(s))
                     .await
                 {
                     Ok(_) => None,
                     // redis set err
-                    Err(e) => Some(CustomError::new(&e)),
+                    Err(e) => Some(CustomError::new(e.as_ref())),
                 }
             }
             // json serde err
@@ -53,22 +51,22 @@ impl RedisSnapshotStore {
     }
 
     pub async fn get_latest(&mut self) -> Result<Option<Snapshot>, CustomError> {
-        return match self
-            .redis_client
-            .get(&*format!("{}{}", TOPIC_SNAPSHOT_PREFIX, self.product_id))
-            .await
-        {
-            Ok(s) => match s {
-                Some(bytes) => match String::from_utf8(bytes.to_vec()) {
+        return match self.redis_client.get(self.snapshot_key.as_str()).await {
+            Ok(obs) => match obs {
+                Some(bs) => match String::from_utf8(bs.to_vec()) {
                     Ok(s) => match serde_json::from_str(&s) {
                         Ok(snapshot) => Ok(Some(snapshot)),
+                        // json obj from str err
                         Err(e) => Err(CustomError::new(&e)),
                     },
+                    //bytes to utf8 str err
                     Err(e) => Err(CustomError::new(&e)),
                 },
+                // redis get none
                 None => Ok(None),
             },
-            Err(e) => Err(CustomError::new(&e)),
+            // redis get err
+            Err(e) => Err(CustomError::new(e.as_ref())),
         };
     }
 }

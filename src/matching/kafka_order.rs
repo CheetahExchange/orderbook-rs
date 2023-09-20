@@ -20,10 +20,10 @@ impl KafkaOrderReader {
     pub fn new_kafka_order_consumer(
         brokers: &[&str],
         product_id: &str,
-        time_out: u64,
+        session_time_out: u64,
     ) -> Result<KafkaOrderReader, CustomError> {
         let topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
-        return match new_kafka_consumer(brokers, topic.as_str(), time_out) {
+        return match new_kafka_consumer(brokers, topic.as_str(), session_time_out) {
             Ok(dc) => Ok(KafkaOrderReader {
                 topic,
                 order_consumer: dc,
@@ -32,13 +32,7 @@ impl KafkaOrderReader {
         };
     }
 
-    pub fn set_offset(&mut self, offset: i64, time_out: u64) -> Option<CustomError> {
-        let offset = if offset == -1i64 {
-            Offset::End
-        } else {
-            Offset::Offset(offset)
-        };
-
+    pub fn set_offset(&mut self, offset: Offset, time_out: u64) -> Option<CustomError> {
         return match self.order_consumer.seek(
             self.topic.as_str(),
             0,

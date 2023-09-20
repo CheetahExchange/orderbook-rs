@@ -15,6 +15,7 @@ pub struct Product {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Order {
     pub id: u64,
+    // use timestamp_nanos
     pub created_at: u64,
     pub product_id: String,
     pub user_id: u64,

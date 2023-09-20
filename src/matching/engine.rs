@@ -1,6 +1,7 @@
+use rdkafka::Offset;
 use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
-use crate::matching::log::Log;
+use crate::matching::log::LogTrait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -58,7 +59,7 @@ impl Engine {
         order_reader: &mut KafkaOrderReader,
         log_store: &mut KafkaLogStore,
     ) {
-        let (log_tx, log_rx) = mpsc::channel::<Box<dyn Log>>(10000);
+        let (log_tx, log_rx) = mpsc::channel::<Box<dyn LogTrait>>(10000);
         let (order_tx, order_rx) = mpsc::channel::<OffsetOrder>(10000);
         let (snapshot_req_tx, snapshot_req_rx) = mpsc::channel::<Snapshot>(32);
         let (snapshot_approve_req_tx, snapshot_approve_req_rx) = mpsc::channel::<Snapshot>(32);
@@ -108,7 +109,7 @@ impl Engine {
         if offset > 0 {
             offset += 1;
         }
-        match order_reader.set_offset(offset as i64, 5) {
+        match order_reader.set_offset(Offset::Offset(offset as i64), 5) {
             Some(e) => {
                 panic!("{}", e);
             }
@@ -150,7 +151,7 @@ impl Engine {
     pub async fn run_applier(
         &mut self,
         order_rx: Receiver<OffsetOrder>,
-        log_tx: Sender<Box<dyn Log>>,
+        log_tx: Sender<Box<dyn LogTrait>>,
         snapshot_req_rx: Receiver<Snapshot>,
         snapshot_approve_req_tx: Sender<Snapshot>,
     ) {
@@ -233,14 +234,14 @@ impl Engine {
 
     pub async fn run_committer(
         log_seq: u64,
-        log_rx: Receiver<Box<dyn Log>>,
+        log_rx: Receiver<Box<dyn LogTrait>>,
         snapshot_approve_req_rx: Receiver<Snapshot>,
         snapshot_tx: Sender<Snapshot>,
         log_store: &mut KafkaLogStore,
     ) {
         let mut seq = log_seq;
         let mut pending: Option<Snapshot> = None;
-        let mut logs: Vec<Box<dyn Log>> = Vec::new();
+        let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let mut snapshot_approve_req_rx = snapshot_approve_req_rx;
         let mut log_rx = log_rx;
 

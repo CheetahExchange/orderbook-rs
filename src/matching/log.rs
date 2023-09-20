@@ -15,19 +15,18 @@ pub enum LogType {
     LogTypeDone,
 }
 
-pub trait Log: erased_serde::Serialize {
+pub trait LogTrait: erased_serde::Serialize {
     fn get_seq(&self) -> u64;
 }
 
-serialize_trait_object!(Log);
+serialize_trait_object!(LogTrait);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Base {
     pub r#type: LogType,
     pub sequence: u64,
     pub product_id: String,
-    #[serde(with = "chrono::serde::ts_nanoseconds")]
-    pub time: DateTime<Utc>,
+    pub time: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -41,7 +40,7 @@ pub struct OpenLog {
     pub time_in_force: TimeInForceType,
 }
 
-impl Log for OpenLog {
+impl LogTrait for OpenLog {
     fn get_seq(&self) -> u64 {
         self.base.sequence
     }
@@ -53,7 +52,7 @@ pub fn new_open_log(log_seq: u64, product_id: &str, taker_order: &BookOrder) -> 
             r#type: LogType::LogTypeOpen,
             sequence: log_seq,
             product_id: product_id.to_string(),
-            time: Utc::now(),
+            time: Utc::now().timestamp_nanos() as u64,
         },
         order_id: taker_order.order_id,
         user_id: taker_order.user_id,
@@ -76,7 +75,7 @@ pub struct DoneLog {
     pub time_in_force: TimeInForceType,
 }
 
-impl Log for DoneLog {
+impl LogTrait for DoneLog {
     fn get_seq(&self) -> u64 {
         self.base.sequence
     }
@@ -94,7 +93,7 @@ pub fn new_done_log(
             r#type: LogType::LogTypeDone,
             sequence: log_seq,
             product_id: product_id.to_string(),
-            time: Utc::now(),
+            time: Utc::now().timestamp_nanos() as u64,
         },
         order_id: order.order_id,
         user_id: order.user_id,
@@ -121,7 +120,7 @@ pub struct MatchLog {
     pub maker_time_in_force: TimeInForceType,
 }
 
-impl Log for MatchLog {
+impl LogTrait for MatchLog {
     fn get_seq(&self) -> u64 {
         self.base.sequence
     }
@@ -141,7 +140,7 @@ pub fn new_match_log(
             r#type: LogType::LogTypeMatch,
             sequence: log_seq,
             product_id: product_id.to_string(),
-            time: Utc::now(),
+            time: Utc::now().timestamp_nanos() as u64,
         },
         trade_seq,
         taker_order_id: taker_order.order_id,

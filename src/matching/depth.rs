@@ -1,17 +1,17 @@
 use crate::matching::order_book::BookOrder;
-use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc, PriceOrderIdKeyOrdering};
+use crate::matching::ordering::{OrderingTrait, PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use crate::utils::error::CustomError;
 use rust_decimal::Decimal;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Sub;
 
-pub struct Depth<T: PriceOrderIdKeyOrdering + Ord> {
+pub struct Depth<T: OrderingTrait + Ord> {
     pub orders: HashMap<u64, BookOrder>,
     pub queue: BTreeMap<T, u64>,
 }
 
-impl<T: PriceOrderIdKeyOrdering + Ord> Depth<T> {
+impl<T: OrderingTrait + Ord> Depth<T> {
     pub fn add(&mut self, order: &BookOrder) {
         self.orders.insert(order.order_id, order.clone());
         self.queue
