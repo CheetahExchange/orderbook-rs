@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use mini_redis::client::Client;
+use rdkafka::message::ToBytes;
 use serde_json;
 use std::result::Result;
 
@@ -21,11 +22,12 @@ impl RedisSnapshotStore {
         port: u16,
     ) -> Result<RedisSnapshotStore, CustomError> {
         return match new_redis_client(ip, port).await {
-            Ok(rc) => Ok(RedisSnapshotStore {
+            Ok(c) => Ok(RedisSnapshotStore {
                 product_id: product_id.to_string(),
-                redis_client: rc,
+                redis_client: c,
             }),
-            Err(e) => Err(CustomError::new(e.as_ref())),
+            // redis connect err
+            Err(e) => Err(CustomError::new(&e)),
         };
     }
 
@@ -36,14 +38,16 @@ impl RedisSnapshotStore {
                     .redis_client
                     .set(
                         &*format!("{}{}", TOPIC_SNAPSHOT_PREFIX, self.product_id),
-                        Bytes::from(s.clone()),
+                        Bytes::from(s.to_bytes()),
                     )
                     .await
                 {
                     Ok(_) => None,
-                    Err(e) => Some(CustomError::new(e.as_ref())),
+                    // redis set err
+                    Err(e) => Some(CustomError::new(&e)),
                 }
             }
+            // json serde err
             Err(e) => Some(CustomError::new(&e)),
         };
     }
@@ -64,7 +68,7 @@ impl RedisSnapshotStore {
                 },
                 None => Ok(None),
             },
-            Err(e) => Err(CustomError::new(e.as_ref())),
+            Err(e) => Err(CustomError::new(&e)),
         };
     }
 }
