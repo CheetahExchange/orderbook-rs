@@ -32,41 +32,37 @@ impl KafkaOrderReader {
         };
     }
 
-    pub fn set_offset(&mut self, offset: Offset, time_out: u64) -> Option<CustomError> {
-        return match self.order_consumer.seek(
-            self.topic.as_str(),
-            0,
-            offset,
-            Timeout::After(Duration::from_secs(time_out)),
-        ) {
-            Ok(_) => None,
-            Err(e) => Some(CustomError::new(&e)),
+    pub fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
+        return match self
+            .order_consumer
+            .seek(self.topic.as_str(), 0, offset, Timeout::Never)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(CustomError::new(&e)),
         };
     }
 
-    pub async fn fetch_message(&mut self) -> (i64, Option<Vec<u8>>, Option<CustomError>) {
+    pub async fn fetch_message(&mut self) -> Result<(i64, Option<Vec<u8>>), CustomError> {
         return match self.order_consumer.recv().await {
-            Err(e) => (0, None, Some(CustomError::new(&e))),
+            // kafka consume err
+            Err(e) => Err(CustomError::new(&e)),
             Ok(message) => match message.payload() {
-                None => (0, None, None),
-                Some(payload) => (message.offset(), Some(payload.to_vec()), None),
+                // payload is none
+                None => Ok((0, None)),
+                Some(payload) => Ok((message.offset(), Some(payload.to_vec()))),
             },
         };
     }
 
-    pub async fn fetch_order(&mut self) -> (i64, Option<Order>, Option<CustomError>) {
-        let (offset, payload, err) = self.fetch_message().await;
-        match err {
-            Some(e) => {
-                return (0, None, Some(e));
-            }
-            _ => {}
-        }
+    pub async fn fetch_order(&mut self) -> Result<(i64, Option<Order>), CustomError> {
+        let (offset, payload) = self.fetch_message().await?;
+
         return match payload {
-            None => (0, None, None),
+            None => Ok((0, None)),
             Some(v) => match serde_json::from_slice(&v) {
-                Err(e) => (0, None, Some(CustomError::new(&e))),
-                Ok(order) => (offset, order, None),
+                Ok(order) => Ok((offset, Some(order))),
+                // json serde err
+                Err(e) => Err(CustomError::new(&e)),
             },
         };
     }

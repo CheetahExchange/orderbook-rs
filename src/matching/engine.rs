@@ -1,7 +1,7 @@
-use rdkafka::Offset;
 use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::log::LogTrait;
+use rdkafka::Offset;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -109,41 +109,39 @@ impl Engine {
         if offset > 0 {
             offset += 1;
         }
-        match order_reader.set_offset(Offset::Offset(offset as i64), 5) {
-            Some(e) => {
+        match order_reader.set_offset(Offset::Offset(offset as i64)) {
+            Err(e) => {
                 panic!("{}", e);
             }
-            None => {}
+            Ok(_) => {}
         }
 
         loop {
-            let (offset, order, err) = order_reader.fetch_order().await;
-            match err {
-                Some(e) => {
+            match order_reader.fetch_order().await {
+                Err(e) => {
                     println!("{}", e);
                     continue;
                 }
-                None => {}
-            }
-            match order {
-                None => {
-                    continue;
-                }
-                Some(o) => {
-                    match order_tx
-                        .send(OffsetOrder {
-                            offset: offset as u64,
-                            order: o,
-                        })
-                        .await
-                    {
-                        Ok(_) => {}
-                        Err(e) => {
-                            println!("{}", e);
-                            continue;
+                Ok((offset, order)) => match order {
+                    None => {
+                        continue;
+                    }
+                    Some(o) => {
+                        match order_tx
+                            .send(OffsetOrder {
+                                offset: offset as u64,
+                                order: o,
+                            })
+                            .await
+                        {
+                            Ok(_) => {}
+                            Err(e) => {
+                                println!("{}", e);
+                                continue;
+                            }
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -268,8 +266,8 @@ impl Engine {
                     }
 
                     match log_store.store(&logs).await {
-                        Some(e) => { panic!("{}", e);}
-                        None => {}
+                        Err(e) => { panic!("{}", e);}
+                        Ok(_) => {}
                     }
                     logs.clear();
 

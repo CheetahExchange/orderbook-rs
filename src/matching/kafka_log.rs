@@ -1,6 +1,7 @@
 use crate::matching::log::LogTrait;
 use crate::utils::error::CustomError;
 use rdkafka::producer::FutureRecord;
+use rdkafka::util::Timeout;
 use std::result::Result;
 use std::time::Duration;
 
@@ -28,7 +29,7 @@ impl KafkaLogStore {
         };
     }
 
-    pub async fn store(&self, logs: &Vec<Box<dyn LogTrait>>) -> Option<CustomError> {
+    pub async fn store(&self, logs: &Vec<Box<dyn LogTrait>>) -> Result<(), CustomError> {
         for log in logs {
             match serde_json::to_string(log) {
                 Ok(s) => {
@@ -36,15 +37,14 @@ impl KafkaLogStore {
                         .log_producer
                         .send(
                             FutureRecord::to(&self.topic).payload(&s).key(""),
-                            Duration::from_secs(5),
+                            Timeout::Never,
                         )
                         .await;
                 }
-                Err(e) => {
-                    return Some(CustomError::new(&e));
-                }
+                // json serde err
+                Err(e) => return Err(CustomError::new(&e)),
             }
         }
-        None
+        Ok(())
     }
 }
