@@ -7,11 +7,38 @@ pub enum OrderType {
     OrderTypeMarket,
 }
 
+impl ToString for OrderType {
+    fn to_string(&self) -> String {
+        return match self {
+            OrderType::OrderTypeLimit => "limit".to_string(),
+            OrderType::OrderTypeMarket => "market".to_string(),
+        };
+    }
+}
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum Side {
     #[default]
     SideBuy,
     SideSell,
+}
+
+impl Side {
+    pub fn opposite(self) -> Self {
+        return match self {
+            Side::SideBuy => Side::SideSell,
+            Side::SideSell => Side::SideBuy,
+        };
+    }
+}
+
+impl ToString for Side {
+    fn to_string(&self) -> String {
+        return match self {
+            Side::SideBuy => "buy".to_string(),
+            Side::SideSell => "sell".to_string(),
+        };
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -21,6 +48,17 @@ pub enum TimeInForceType {
     ImmediateOrCancel,
     GoodTillCrossing,
     FillOrKill,
+}
+
+impl ToString for TimeInForceType {
+    fn to_string(&self) -> String {
+        return match self {
+            TimeInForceType::GoodTillCanceled => "GTC".to_string(),
+            TimeInForceType::ImmediateOrCancel => "IOC".to_string(),
+            TimeInForceType::GoodTillCrossing => "GTX".to_string(),
+            TimeInForceType::FillOrKill => "FOK".to_string(),
+        };
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -34,11 +72,33 @@ pub enum OrderStatus {
     OrderStatusFilled,
 }
 
+impl ToString for OrderStatus {
+    fn to_string(&self) -> String {
+        return match self {
+            OrderStatus::OrderStatusNew => "new".to_string(),
+            OrderStatus::OrderStatusOpen => "open".to_string(),
+            OrderStatus::OrderStatusCancelling => "cancelling".to_string(),
+            OrderStatus::OrderStatusCancelled => "cancelled".to_string(),
+            OrderStatus::OrderStatusPartial => "partial".to_string(),
+            OrderStatus::OrderStatusFilled => "filled".to_string(),
+        };
+    }
+}
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub enum DoneReason {
     #[default]
     DoneReasonFilled,
     DoneReasonCancelled,
+}
+
+impl ToString for DoneReason {
+    fn to_string(&self) -> String {
+        return match self {
+            DoneReason::DoneReasonFilled => "filled".to_string(),
+            DoneReason::DoneReasonCancelled => "cancelled".to_string(),
+        };
+    }
 }
 
 pub const ORDER_TYPE_LIMIT: OrderType = OrderType::OrderTypeLimit;
