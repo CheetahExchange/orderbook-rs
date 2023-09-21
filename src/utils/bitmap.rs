@@ -1,11 +1,9 @@
+use rust_decimal::prelude::Zero;
 use serde::{Deserialize, Serialize};
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref TA: Vec<u8> = vec![1, 2, 4, 8, 16, 32, 64, 128];
-    static ref TB: Vec<u8> = vec![254, 253, 251, 247, 239, 223, 191, 127];
-}
+const BITS_COUNT: usize = 8;
+const TA: [u8; BITS_COUNT] = [1, 2, 4, 8, 16, 32, 64, 128];
+const TB: [u8; BITS_COUNT] = [254, 253, 251, 247, 239, 223, 191, 127];
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Bitmap {
@@ -13,10 +11,10 @@ pub struct Bitmap {
 }
 
 impl Bitmap {
-    pub fn new(max: u64) -> Self {
-        let remainder = if max.clone() % 8 == 0 { 0 } else { 1 };
-        let mut v: Vec<u8> = vec![];
-        v.reserve((max.clone() / 8 + remainder) as usize);
+    pub fn new(l: u64) -> Self {
+        let r = if l % 8 == 0 { 0 } else { 1 };
+        let mut v: Vec<u8> = Vec::<u8>::default();
+        v.reserve((l / 8 + r) as usize);
         Bitmap { data: v }
     }
 
@@ -25,33 +23,47 @@ impl Bitmap {
     }
 
     pub fn get(&self, k: u64) -> bool {
-        let (idx, bit) = (k.clone() / 8, k.clone() % 8);
-        match self.data.get(idx as usize) {
+        let (byte_idx, bit_idx) = (k / 8, k % 8);
+        match self.data.get(byte_idx as usize) {
             Some(byte) => {
-                let ta = TA.get(bit as usize).unwrap();
-                return byte & ta != 0;
+                return Bitmap::get_bit(*byte, bit_idx);
             }
             None => {
-                panic!("too large k");
+                panic!("out of range");
             }
         }
     }
 
     pub fn set(&mut self, k: u64, v: bool) {
-        let (idx, bit) = (k.clone() / 8, k.clone() % 8);
-        match self.data.get(idx.clone() as usize) {
+        let (byte_idx, bit_idx) = (k / 8, k % 8);
+        match self.data.get(byte_idx as usize) {
             Some(byte) => {
-                if v {
-                    let ta = TA.get(bit as usize).unwrap();
-                    self.data[idx as usize] = byte | ta;
-                } else {
-                    let tb = TB.get(bit as usize).unwrap();
-                    self.data[idx as usize] = byte & tb;
-                }
+                self.data[byte_idx as usize] = Bitmap::set_bit(*byte, bit_idx, v);
             }
             None => {
-                panic!("too large k");
+                panic!("out of range");
             }
         }
+    }
+
+    pub fn get_bit(byte: u8, bit_idx: u64) -> bool {
+        if bit_idx.ge(&8u64) {
+            panic!("wrong parameter: bit");
+        }
+        let ta = TA[bit_idx as usize];
+        return !(byte & ta).is_zero();
+    }
+
+    pub fn set_bit(byte: u8, bit_idx: u64, v: bool) -> u8 {
+        if bit_idx.ge(&8u64) {
+            panic!("wrong parameter: bit");
+        }
+        return if v {
+            let ta = TA[bit_idx as usize];
+            byte | ta
+        } else {
+            let tb = TB[bit_idx as usize];
+            byte & tb
+        };
     }
 }
