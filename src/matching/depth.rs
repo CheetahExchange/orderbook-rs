@@ -18,13 +18,14 @@ impl<T: OrderingTrait + Ord> Depth<T> {
             .insert(T::new(&order.price, order.order_id), order.order_id);
     }
 
-    pub fn decr_size(&mut self, order_id: u64, size: &Decimal) -> Option<CustomError> {
+    pub fn decr_size(&mut self, order_id: u64, size: &Decimal) -> Result<(), CustomError> {
         return match self.orders.get(&order_id) {
             Some(order) => {
                 let mut order = order.clone();
                 match Decimal::cmp(&order.size, size) {
-                    Ordering::Less => Some(CustomError::from_string(format!(
-                        "order {} Size {} less than {}",
+                    // order found in order book is not enough size (maybe some fatal issue)
+                    Ordering::Less => Err(CustomError::from_string(format!(
+                        "order {} size {} less than {}",
                         order_id, order.size, size
                     ))),
                     _ => {
@@ -33,11 +34,12 @@ impl<T: OrderingTrait + Ord> Depth<T> {
                             self.orders.remove(&order_id);
                             self.queue.remove(&T::new(&order.price, order.order_id));
                         }
-                        None
+                        Ok(())
                     }
                 }
             }
-            None => Some(CustomError::from_string(format!(
+            // order not found in order book (maybe some fatal issue)
+            None => Err(CustomError::from_string(format!(
                 "order {} not found on book",
                 order_id
             ))),
@@ -45,5 +47,9 @@ impl<T: OrderingTrait + Ord> Depth<T> {
     }
 }
 
+// AskDepth is order by key PriceOrderIdKeyAsc
+// order by price ASC first, and then order id ASC
 pub type AskDepth = Depth<PriceOrderIdKeyAsc>;
+// BidDepth is order by key PriceOrderIdKeyDesc
+// order by price DESC first, and then order id ASC
 pub type BidDepth = Depth<PriceOrderIdKeyDesc>;

@@ -227,10 +227,10 @@ impl OrderBook {
                     }
 
                     match self.ask_depths.decr_size(maker_order.order_id, &size) {
-                        Some(e) => {
+                        Err(e) => {
                             panic!("{}", e);
                         }
-                        None => {}
+                        Ok(()) => {}
                     }
 
                     let log_seq = self.next_log_seq();
@@ -269,10 +269,10 @@ impl OrderBook {
                     taker_order.size = taker_order.size.sub(size);
 
                     match self.bid_depths.decr_size(maker_order.order_id, &size) {
-                        Some(e) => {
+                        Err(e) => {
                             panic!("{}", e);
                         }
-                        None => {}
+                        Ok(()) => {}
                     }
 
                     let log_seq = self.next_log_seq();
@@ -380,10 +380,10 @@ impl OrderBook {
                 if r.is_some() {
                     let o = r.unwrap().clone();
                     match self.ask_depths.decr_size(order.id, &o.size) {
-                        Some(e) => {
+                        Err(e) => {
                             panic!("{}", e);
                         }
-                        None => {
+                        Ok(()) => {
                             f = true;
                             book_order = o.clone();
                         }
@@ -395,10 +395,10 @@ impl OrderBook {
                 if r.is_some() {
                     let o = r.unwrap().clone();
                     match self.bid_depths.decr_size(order.id, &o.size) {
-                        Some(e) => {
+                        Err(e) => {
                             panic!("{}", e);
                         }
-                        None => {
+                        Ok(()) => {
                             f = true;
                             book_order = o.clone();
                         }
