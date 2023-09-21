@@ -84,11 +84,14 @@ impl OrderBook {
 
     pub fn is_order_will_not_match(&self, order: &Order) -> bool {
         let mut taker_order = BookOrder::new_book_order(order);
-        if taker_order.r#type == OrderType::OrderTypeMarket {
-            taker_order.price = match taker_order.side {
-                Side::SideBuy => Decimal::MAX,
-                Side::SideSell => Decimal::ZERO,
+        match taker_order.r#type {
+            OrderType::OrderTypeMarket => {
+                taker_order.price = match taker_order.side {
+                    Side::SideBuy => Decimal::MAX,
+                    Side::SideSell => Decimal::ZERO,
+                }
             }
+            _ => {}
         }
 
         return match taker_order.side {
