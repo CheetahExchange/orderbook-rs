@@ -75,6 +75,7 @@ impl OrderBook {
                 orders: HashMap::<u64, BookOrder>::new(),
                 queue: BTreeMap::<PriceOrderIdKeyDesc, u64>::new(),
             },
+
             trade_seq: 0,
             log_seq: 0,
             order_id_window: Window::new(0, ORDER_ID_WINDOW_CAP),
@@ -83,21 +84,20 @@ impl OrderBook {
 
     pub fn is_order_will_not_match(&self, order: &Order) -> bool {
         let mut taker_order = BookOrder::new_book_order(order);
-        match taker_order.r#type {
-            OrderType::OrderTypeMarket => {
-                taker_order.price = match taker_order.side {
-                    Side::SideBuy => Decimal::MAX,
-                    Side::SideSell => Decimal::ZERO,
-                }
+        if taker_order.r#type == OrderType::OrderTypeMarket {
+            taker_order.price = match taker_order.side {
+                Side::SideBuy => Decimal::MAX,
+                Side::SideSell => Decimal::ZERO,
             }
-            _ => {}
         }
 
         return match taker_order.side {
+            // the Sell One
             Side::SideBuy => match self.ask_depths.queue.first_key_value() {
                 None => true,
                 Some((_k, v)) => {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
+                    // if taker buy price is less than Sell One price
                     if taker_order.price.lt(&maker_order.price) {
                         true
                     } else {
@@ -105,10 +105,12 @@ impl OrderBook {
                     }
                 }
             },
+            // the Buy One
             Side::SideSell => match self.bid_depths.queue.first_key_value() {
                 None => true,
                 Some((_k, v)) => {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
+                    // if taker sell price is greater than Buy One price
                     if taker_order.price.gt(&maker_order.price) {
                         true
                     } else {
