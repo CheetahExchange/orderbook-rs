@@ -14,15 +14,15 @@ pub struct Window {
 impl Window {
     pub fn new(min: u64, max: u64) -> Self {
         Window {
-            min: min.clone(),
-            max: max.clone(),
-            cap: max.clone() - min.clone(),
-            bit_map: Bitmap::new(max.clone() - min.clone()),
+            min,
+            max,
+            cap: max - min,
+            bit_map: Bitmap::new(max - min),
         }
     }
 
     pub fn put(&mut self, val: u64) -> Option<CustomError> {
-        return if val.clone() <= self.min {
+        return if val <= self.min {
             Some(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
@@ -30,18 +30,18 @@ impl Window {
                 )
                 .to_string(),
             ))
-        } else if val.clone() > self.max {
-            let delta = val.clone() - self.max.clone();
-            self.min += delta.clone();
-            self.max += delta.clone();
-            self.bit_map.set(val.clone() % self.cap.clone(), true);
+        } else if val > self.max {
+            let delta = val - self.max;
+            self.min += delta;
+            self.max += delta;
+            self.bit_map.set(val % self.cap, true);
             None
-        } else if self.bit_map.get(val.clone() % self.cap.clone()) {
+        } else if self.bit_map.get(val % self.cap) {
             Some(CustomError::from_string(
-                format!("existed val {}", val.clone()).to_string(),
+                format!("existed val {}", val).to_string(),
             ))
         } else {
-            self.bit_map.set(val.clone() % self.cap.clone(), true);
+            self.bit_map.set(val % self.cap, true);
             None
         };
     }
