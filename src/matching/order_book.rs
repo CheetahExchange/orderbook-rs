@@ -140,6 +140,12 @@ impl OrderBook {
             Side::SideBuy => {
                 for (_k, v) in &self.ask_depths.queue {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
+
+                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        Ordering::Less => break,
+                        _ => {}
+                    }
+
                     match taker_order.r#type {
                         OrderType::OrderTypeLimit => {
                             if taker_order.size.is_zero() {
@@ -149,7 +155,7 @@ impl OrderBook {
                             taker_order.size = taker_order.size.sub(size);
                         }
                         OrderType::OrderTypeMarket => {
-                            if taker_order.size.is_zero() {
+                            if taker_order.funds.is_zero() {
                                 break;
                             }
                             let taker_size = taker_order
@@ -166,6 +172,12 @@ impl OrderBook {
             Side::SideSell => {
                 for (_k, v) in &self.bid_depths.queue {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
+
+                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        Ordering::Greater => break,
+                        _ => {}
+                    }
+
                     if taker_order.size.is_zero() {
                         break;
                     }
@@ -208,7 +220,19 @@ impl OrderBook {
             Side::SideBuy => {
                 for (_k, v) in &(self.ask_depths.queue.clone()) {
                     let maker_order = self.ask_depths.orders.get(v).unwrap().clone();
+
+                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        Ordering::Less => break,
+                        _ => {}
+                    }
+
                     let mut size = Decimal::default();
+
+                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        Ordering::Less => break,
+                        _ => {}
+                    }
+
                     match taker_order.r#type {
                         OrderType::OrderTypeLimit => {
                             if taker_order.size.is_zero() {
@@ -218,7 +242,7 @@ impl OrderBook {
                             taker_order.size = taker_order.size.sub(size);
                         }
                         OrderType::OrderTypeMarket => {
-                            if taker_order.size.is_zero() {
+                            if taker_order.funds.is_zero() {
                                 break;
                             }
                             let taker_size = taker_order
@@ -267,6 +291,12 @@ impl OrderBook {
             Side::SideSell => {
                 for (_k, v) in &(self.bid_depths.queue.clone()) {
                     let maker_order = self.bid_depths.orders.get(v).unwrap().clone();
+
+                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        Ordering::Greater => break,
+                        _ => {}
+                    }
+
                     if taker_order.size.is_zero() {
                         break;
                     }
