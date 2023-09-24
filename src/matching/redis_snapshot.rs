@@ -32,7 +32,7 @@ impl RedisSnapshotStore {
         };
     }
 
-    pub async fn store(&mut self, snapshot: &Snapshot) -> Option<CustomError> {
+    pub async fn store(&mut self, snapshot: &Snapshot) -> Result<(), CustomError> {
         return match serde_json::to_string(snapshot) {
             Ok(s) => {
                 match self
@@ -40,13 +40,13 @@ impl RedisSnapshotStore {
                     .set(self.snapshot_key.as_str(), Bytes::from(s))
                     .await
                 {
-                    Ok(_) => None,
+                    Ok(_) => Ok(()),
                     // redis set err
-                    Err(e) => Some(CustomError::new(e.as_ref())),
+                    Err(e) => Err(CustomError::new(e.as_ref())),
                 }
             }
             // json serde err
-            Err(e) => Some(CustomError::new(&e)),
+            Err(e) => Err(CustomError::new(&e)),
         };
     }
 

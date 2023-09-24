@@ -20,13 +20,16 @@ async fn main() {
         base_scale: 6,
         quote_scale: 2,
     };
+
     let mut snapshot_store =
         RedisSnapshotStore::new_redis_snapshot_store(&product.id, "127.0.0.1", 6379)
             .await
             .unwrap_or_else(|e| panic!("{}", e));
+
     let mut order_reader =
         KafkaOrderReader::new_kafka_order_consumer(&["127.0.0.1:9092"], &product.id, 30)
             .unwrap_or_else(|e| panic!("{}", e));
+
     let mut log_store = KafkaLogStore::new_kafka_log_producer(&["127.0.0.1:9092"], &product.id, 30)
         .unwrap_or_else(|e| panic!("{}", e));
 

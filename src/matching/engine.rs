@@ -70,6 +70,7 @@ impl Engine {
         let log_seq = self.order_book.log_seq;
 
         let fut1 = Engine::run_fetcher(order_offset, order_reader, order_tx);
+
         let fut2 = Engine::run_applier(
             self,
             order_rx,
@@ -77,6 +78,7 @@ impl Engine {
             snapshot_req_rx,
             snapshot_approve_req_tx,
         );
+
         let fut3 = Engine::run_committer(
             log_seq,
             log_rx,
@@ -84,6 +86,7 @@ impl Engine {
             snapshot_tx,
             log_store,
         );
+
         let fut4 = Engine::run_snapshots(
             &product_id,
             order_offset,
@@ -110,11 +113,8 @@ impl Engine {
         if offset > 0 {
             offset += 1;
         }
-        match order_reader.set_offset(Offset::Offset(offset as i64)) {
-            Err(e) => {
-                panic!("{}", e);
-            }
-            Ok(_) => {}
+        if let Err(e) = order_reader.set_offset(Offset::Offset(offset as i64)) {
+            panic!("set order reader offset error: {}", e);
         }
 
         loop {
@@ -123,26 +123,20 @@ impl Engine {
                     println!("{}", e);
                     continue;
                 }
-                Ok((offset, order)) => match order {
-                    None => {
-                        continue;
-                    }
-                    Some(o) => {
-                        match order_tx
+                Ok((offset, order)) => {
+                    if let Some(o) = order {
+                        if let Err(e) = order_tx
                             .send(OffsetOrder {
                                 offset: offset as u64,
                                 order: o,
                             })
                             .await
                         {
-                            Ok(_) => {}
-                            Err(e) => {
-                                println!("{}", e);
-                                continue;
-                            }
+                            println!("{}", e);
+                            continue;
                         }
                     }
-                },
+                }
             }
         }
     }
@@ -197,12 +191,9 @@ impl Engine {
                     }
 
                     for log in logs {
-                        match log_tx.send(log).await{
-                            Ok(_) => {}
-                            Err(e) => {
-                                println!("{}", e);
-                                continue;
-                            }
+                        if let Err(e) = log_tx.send(log).await{
+                            println!("{}", e);
+                            continue;
                         }
                     }
 
@@ -216,15 +207,13 @@ impl Engine {
 
                     println!("should take snapshot: {} {}-[{}]-{}->",
                         self.product_id, snapshot.order_offset, delta, order_offset);
+
                     snapshot.order_book_snapshot = Some(self.order_book.snapshot());
                     snapshot.order_offset = order_offset;
 
-                    match snapshot_approve_req_tx.send(snapshot).await{
-                        Ok(_) => {}
-                        Err(e) => {
-                            println!("{}", e);
-                            continue;
-                        }
+                    if let Err(e) = snapshot_approve_req_tx.send(snapshot).await {
+                        println!("{}", e);
+                        continue;
                     }
                 }
             }
@@ -241,19 +230,23 @@ impl Engine {
         let mut seq = log_seq;
         let mut pending: Option<Snapshot> = None;
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
+
         let mut snapshot_approve_req_rx = snapshot_approve_req_rx;
         let mut log_rx = log_rx;
 
         loop {
             select! {
                 Some(log) = log_rx.recv() => {
+                    // discard duplicate log
                     if log.get_seq() <= seq {
                         println!("discard log seq={}", seq);
                         continue;
                     }
+
                     seq = log.get_seq();
                     logs.push(log);
 
+                    // channel is not empty and buffer is not full, continue read.
                     for _ in 0..100 {
                         match log_rx.try_recv() {
                             Ok(log) => {
@@ -266,47 +259,35 @@ impl Engine {
                         }
                     }
 
-                    match log_store.store(&logs).await {
-                        Err(e) => { panic!("{}", e);}
-                        Ok(_) => {}
+                    // store log, clean buffer
+                    if let Err(e) = log_store.store(&logs).await {
+                        panic!("{}", e);
                     }
                     logs.clear();
 
-                    match &pending {
-                        Some(p) => {
-                            if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
-                                match snapshot_tx.send(p.clone()).await{
-                                    Ok(_) => {},
-                                    Err(e) => {
-                                        println!("{}", e);
-                                        continue;
-                                    }
-                                };
-                                pending = None;
-                            }
-                        },
-                        None => {}
+                    // approve pending snapshot
+                    if let Some(p) = &pending {
+                        if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
+                            if let Err(e) = snapshot_tx.send(p.clone()).await{
+                                println!("{}", e);
+                                continue;
+                            };
+                            pending = None;
+                        }
                     }
                 },
                 Some(snapshot) = snapshot_approve_req_rx.recv() => {
                     if seq >= snapshot.order_book_snapshot.clone().unwrap().log_seq {
-                        match snapshot_tx.send(snapshot.clone()).await{
-                            Ok(_) => {},
-                            Err(e) => {
-                                println!("{}", e);
-                                continue;
-                            }
+                        if let Err(e) = snapshot_tx.send(snapshot.clone()).await{
+                            println!("{}", e);
+                            continue;
                         };
                         pending = None;
                         continue;
                     }
 
-                    match &pending {
-                        Some(p) => {
-                            println!("discard snapshot request (seq={}), new one (seq={}) received",
-                            p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
-                        },
-                        None => {}
+                    if let Some(p) = &pending {
+                        println!("discard snapshot request (seq={}), new one (seq={}) received", p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
                     }
                     pending = Some(snapshot);
                 }
@@ -323,31 +304,28 @@ impl Engine {
     ) {
         let mut order_offset = order_offset;
         let mut snapshot_rx = snapshot_rx;
+
         loop {
             select! {
                 _ = sleep(Duration::from_secs(30)) => {
-                    match snapshot_req_tx.send(Snapshot{
+                    // make a new snapshot request
+                    if let Err(e) = snapshot_req_tx.send(Snapshot{
                         order_book_snapshot: None,
                         order_offset: order_offset,
                     }).await{
-                        Ok(_) => {},
-                        Err(e) => {
-                            println!("{}", e);
-                            continue;
-                        }
+                        println!("{}", e);
+                        continue;
                     };
                 },
                 Some(snapshot) = snapshot_rx.recv() => {
-                    match snapshot_store.store(&snapshot).await {
-                        Some(e) => {
-                            println!("store snapshot failed: {}", e);
-                            continue;
-                        },
-                        None => {}
+                    // store snapshot
+                    if let Err(e) = snapshot_store.store(&snapshot).await {
+                        println!("store snapshot failed: {}", e);
+                        continue;
                     }
-                    println!("new snapshot stored :product={} OrderOffset={} LogSeq={}",
-                    product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
+                    println!("new snapshot stored :product={} OrderOffset={} LogSeq={}", product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
 
+                    // update offset for next snapshot request
                     order_offset = snapshot.order_offset;
                 }
             }
