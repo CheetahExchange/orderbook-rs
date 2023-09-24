@@ -21,9 +21,9 @@ impl Window {
         }
     }
 
-    pub fn put(&mut self, val: u64) -> Option<CustomError> {
+    pub fn put(&mut self, val: u64) -> Result<(), CustomError> {
         return if val <= self.min {
-            Some(CustomError::from_string(
+            Err(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
                     val, self.min, self.max
@@ -35,14 +35,14 @@ impl Window {
             self.min += delta;
             self.max += delta;
             self.bit_map.set(val % self.cap, true);
-            None
+            Ok(())
         } else if self.bit_map.get(val % self.cap) {
-            Some(CustomError::from_string(
+            Err(CustomError::from_string(
                 format!("existed val {}", val).to_string(),
             ))
         } else {
             self.bit_map.set(val % self.cap, true);
-            None
+            Ok(())
         };
     }
 

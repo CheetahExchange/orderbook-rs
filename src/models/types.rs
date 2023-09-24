@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum OrderType {
-    #[default]
     OrderTypeLimit,
     OrderTypeMarket,
 }
@@ -16,9 +15,8 @@ impl ToString for OrderType {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Side {
-    #[default]
     SideBuy,
     SideSell,
 }
@@ -41,9 +39,8 @@ impl ToString for Side {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TimeInForceType {
-    #[default]
     GoodTillCanceled,
     ImmediateOrCancel,
     GoodTillCrossing,
@@ -61,9 +58,8 @@ impl ToString for TimeInForceType {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum OrderStatus {
-    #[default]
     OrderStatusNew,
     OrderStatusOpen,
     OrderStatusCancelling,
@@ -85,9 +81,8 @@ impl ToString for OrderStatus {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum DoneReason {
-    #[default]
     DoneReasonFilled,
     DoneReasonCancelled,
 }

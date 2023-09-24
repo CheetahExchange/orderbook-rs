@@ -6,6 +6,7 @@ use crate::matching::depth::{AskDepth, BidDepth};
 use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
 use rust_decimal::prelude::Zero;
 use std::cmp::Ordering;
+use std::cmp::Ordering::Greater;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
@@ -18,7 +19,7 @@ use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BookOrder {
     pub order_id: u64,
     pub user_id: u64,
@@ -28,6 +29,21 @@ pub struct BookOrder {
     pub side: Side,
     pub r#type: OrderType,
     pub time_in_force: TimeInForceType,
+}
+
+impl Default for BookOrder {
+    fn default() -> Self {
+        BookOrder {
+            order_id: 0,
+            user_id: 0,
+            size: Default::default(),
+            funds: Default::default(),
+            price: Default::default(),
+            side: Side::SideBuy,
+            r#type: OrderType::OrderTypeLimit,
+            time_in_force: TimeInForceType::GoodTillCanceled,
+        }
+    }
 }
 
 impl BookOrder {
@@ -84,66 +100,64 @@ impl OrderBook {
 
     pub fn is_order_will_not_match(&self, order: &Order) -> bool {
         let mut taker_order = BookOrder::new_book_order(order);
-        match taker_order.r#type {
-            OrderType::OrderTypeMarket => {
-                taker_order.price = match taker_order.side {
-                    Side::SideBuy => Decimal::MAX,
-                    Side::SideSell => Decimal::ZERO,
-                }
+
+        // If it's a Market-Buy order, set price to infinite high, and if it's market-sell,
+        // set price to zero, which ensures that prices will cross.
+        if let OrderType::OrderTypeMarket = taker_order.r#type {
+            taker_order.price = match taker_order.side {
+                Side::SideBuy => Decimal::MAX,
+                Side::SideSell => Decimal::ZERO,
             }
-            _ => {}
         }
 
-        return match taker_order.side {
-            // the Sell One
+        match taker_order.side {
+            // Need to check sell-one price
             Side::SideBuy => match self.ask_depths.queue.first_key_value() {
-                None => true,
-                Some((_k, v)) => {
+                None => return true,
+                Some((_, v)) => {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
-                    // if taker buy price is less than Sell One price
+                    // if taker's buy price is less than sell-one price
                     if taker_order.price.lt(&maker_order.price) {
-                        true
-                    } else {
-                        false
+                        return true;
                     }
                 }
             },
-            // the Buy One
+            // Need to check buy-one price
             Side::SideSell => match self.bid_depths.queue.first_key_value() {
-                None => true,
+                None => return true,
                 Some((_k, v)) => {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
-                    // if taker sell price is greater than Buy One price
+                    // if taker's sell price is greater than buy-one price
                     if taker_order.price.gt(&maker_order.price) {
-                        true
-                    } else {
-                        false
+                        return true;
                     }
                 }
             },
         };
+
+        false
     }
 
     pub fn is_order_will_full_match(&self, order: &Order) -> bool {
         let mut taker_order = BookOrder::new_book_order(order);
-        match taker_order.r#type {
-            OrderType::OrderTypeMarket => {
-                taker_order.price = match taker_order.side {
-                    Side::SideBuy => Decimal::MAX,
-                    Side::SideSell => Decimal::ZERO,
-                }
+
+        // If it's a Market-Buy order, set price to infinite high, and if it's market-sell,
+        // set price to zero, which ensures that prices will cross.
+        if let OrderType::OrderTypeMarket = taker_order.r#type {
+            taker_order.price = match taker_order.side {
+                Side::SideBuy => Decimal::MAX,
+                Side::SideSell => Decimal::ZERO,
             }
-            _ => {}
         }
 
         match taker_order.side {
             Side::SideBuy => {
-                for (_k, v) in &self.ask_depths.queue {
+                for (_, v) in &self.ask_depths.queue {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
 
-                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
-                        Ordering::Less => break,
-                        _ => {}
+                    // check whether there is price crossing between the taker and the maker
+                    if Ordering::Less == Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        break;
                     }
 
                     match taker_order.r#type {
@@ -151,86 +165,97 @@ impl OrderBook {
                             if taker_order.size.is_zero() {
                                 break;
                             }
+
+                            // Take the minimum size of taker and maker as trade size
                             let size = Decimal::min(taker_order.size, maker_order.size);
+
+                            // adjust the size of taker order
                             taker_order.size = taker_order.size.sub(size);
                         }
                         OrderType::OrderTypeMarket => {
                             if taker_order.funds.is_zero() {
                                 break;
                             }
+
+                            // calculate the size of taker at current price
                             let taker_size = taker_order
                                 .funds
                                 .div(maker_order.price)
                                 .trunc_with_scale(self.product.base_scale as u32);
+                            if taker_size.is_zero() {
+                                break;
+                            }
+
+                            // Take the minimum size of taker and maker as trade size
                             let size = Decimal::min(taker_size, maker_order.size);
                             let funds = size.mul(maker_order.price);
+
+                            // adjust the funds of taker order
                             taker_order.funds = taker_order.funds.sub(funds);
                         }
                     }
                 }
             }
             Side::SideSell => {
-                for (_k, v) in &self.bid_depths.queue {
+                for (_, v) in &self.bid_depths.queue {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
 
-                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
-                        Ordering::Greater => break,
-                        _ => {}
+                    // check whether there is price crossing between the taker and the maker
+                    if Ordering::Greater == Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        break;
                     }
 
                     if taker_order.size.is_zero() {
                         break;
                     }
+
+                    // Take the minimum size of taker and maker as trade size
                     let size = Decimal::min(taker_order.size, maker_order.size);
+
+                    // adjust the size of taker order
                     taker_order.size = taker_order.size.sub(size);
                 }
             }
         }
 
-        return match taker_order.r#type {
-            OrderType::OrderTypeLimit => match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
-                Ordering::Greater => false,
-                _ => true,
-            },
-            _ => true,
-        };
+        if let OrderType::OrderTypeLimit = taker_order.r#type {
+            if Ordering::Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+                return false;
+            }
+        }
+
+        true
     }
 
     pub fn apply_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
-        match self.order_id_window.put(order.id) {
-            Some(_e) => {
-                return logs;
-            }
-            _ => {}
+
+        // prevent orders from being submitted repeatedly to the matching engine
+        if let Err(_) = self.order_id_window.put(order.id) {
+            return logs;
         }
 
         let mut taker_order = BookOrder::new_book_order(order);
-        match taker_order.r#type {
-            OrderType::OrderTypeMarket => {
-                taker_order.price = match taker_order.side {
-                    Side::SideBuy => Decimal::MAX,
-                    Side::SideSell => Decimal::ZERO,
-                }
+
+        // If it's a Market-Buy order, set price to infinite high, and if it's market-sell,
+        // set price to zero, which ensures that prices will cross.
+        if let OrderType::OrderTypeMarket = taker_order.r#type {
+            taker_order.price = match taker_order.side {
+                Side::SideBuy => Decimal::MAX,
+                Side::SideSell => Decimal::ZERO,
             }
-            _ => {}
         }
 
         match taker_order.side {
             Side::SideBuy => {
-                for (_k, v) in &(self.ask_depths.queue.clone()) {
+                for (_, v) in &(self.ask_depths.queue.clone()) {
                     let maker_order = self.ask_depths.orders.get(v).unwrap().clone();
-
-                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
-                        Ordering::Less => break,
-                        _ => {}
-                    }
 
                     let mut size = Decimal::default();
 
-                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
-                        Ordering::Less => break,
-                        _ => {}
+                    // check whether there is price crossing between the taker and the maker
+                    if Ordering::Less == Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        break;
                     }
 
                     match taker_order.r#type {
@@ -238,33 +263,45 @@ impl OrderBook {
                             if taker_order.size.is_zero() {
                                 break;
                             }
+
+                            // Take the minimum size of taker and maker as trade size
                             size = Decimal::min(taker_order.size, maker_order.size);
+
+                            // adjust the size of taker order
                             taker_order.size = taker_order.size.sub(size);
                         }
                         OrderType::OrderTypeMarket => {
                             if taker_order.funds.is_zero() {
                                 break;
                             }
+
+                            // calculate the size of taker at current price
                             let taker_size = taker_order
                                 .funds
                                 .div(maker_order.price)
                                 .trunc_with_scale(self.product.base_scale as u32);
+
+                            if taker_size.is_zero() {
+                                break;
+                            }
+
+                            // Take the minimum size of taker and maker as trade size
                             size = Decimal::min(taker_size, maker_order.size);
                             let funds = size.mul(maker_order.price);
+
+                            // adjust the funds of taker order
                             taker_order.funds = taker_order.funds.sub(funds);
                         }
                     }
 
-                    match self.ask_depths.decr_size(maker_order.order_id, &size) {
-                        Err(e) => {
-                            panic!("{}", e);
-                        }
-                        Ok(()) => {}
+                    // adjust the size of maker order
+                    if let Err(e) = self.ask_depths.decr_size(maker_order.order_id, &size) {
+                        panic!("{}", e);
                     }
 
-                    let log_seq = self.next_log_seq();
-                    let trade_seq = self.next_trade_seq();
-                    let match_log = new_match_log(
+                    // matched,write a log
+                    let (log_seq, trade_seq) = (self.next_log_seq(), self.next_trade_seq());
+                    logs.push(Box::new(new_match_log(
                         log_seq,
                         &self.product.id,
                         trade_seq,
@@ -272,47 +309,47 @@ impl OrderBook {
                         &maker_order,
                         &maker_order.price,
                         &size,
-                    );
-                    logs.push(Box::new(match_log));
+                    )));
 
+                    // maker is filled
                     if maker_order.size.is_zero() {
-                        let log_seq = self.next_log_seq();
-                        let done_log = new_done_log(
-                            log_seq,
+                        logs.push(Box::new(new_done_log(
+                            self.next_log_seq(),
                             &self.product.id,
                             &maker_order,
                             &maker_order.size,
                             &DONE_REASON_FILLED,
-                        );
-                        logs.push(Box::new(done_log));
+                        )));
                     }
                 }
             }
             Side::SideSell => {
-                for (_k, v) in &(self.bid_depths.queue.clone()) {
+                for (_, v) in &(self.bid_depths.queue.clone()) {
                     let maker_order = self.bid_depths.orders.get(v).unwrap().clone();
 
-                    match Decimal::cmp(&taker_order.price, &maker_order.price) {
-                        Ordering::Greater => break,
-                        _ => {}
+                    // check whether there is price crossing between the taker and the maker
+                    if Ordering::Greater == Decimal::cmp(&taker_order.price, &maker_order.price) {
+                        break;
                     }
 
                     if taker_order.size.is_zero() {
                         break;
                     }
+
+                    // Take the minimum size of taker and maker as trade size
                     let size = Decimal::min(taker_order.size, maker_order.size);
+
+                    // adjust the size of taker order
                     taker_order.size = taker_order.size.sub(size);
 
-                    match self.bid_depths.decr_size(maker_order.order_id, &size) {
-                        Err(e) => {
-                            panic!("{}", e);
-                        }
-                        Ok(()) => {}
+                    // adjust the size of maker order
+                    if let Err(e) = self.bid_depths.decr_size(maker_order.order_id, &size) {
+                        panic!("{}", e);
                     }
 
-                    let log_seq = self.next_log_seq();
-                    let trade_seq = self.next_trade_seq();
-                    let match_log = new_match_log(
+                    // matched,write a log
+                    let (log_seq, trade_seq) = (self.next_log_seq(), self.next_trade_seq());
+                    logs.push(Box::new(new_match_log(
                         log_seq,
                         &self.product.id,
                         trade_seq,
@@ -320,39 +357,25 @@ impl OrderBook {
                         &maker_order,
                         &maker_order.price,
                         &size,
-                    );
-                    logs.push(Box::new(match_log));
+                    )));
 
+                    // maker is filled
                     if maker_order.size.is_zero() {
-                        let log_seq = self.next_log_seq();
-                        let done_log = new_done_log(
-                            log_seq,
+                        logs.push(Box::new(new_done_log(
+                            self.next_log_seq(),
                             &self.product.id,
                             &maker_order,
                             &maker_order.size,
                             &DONE_REASON_FILLED,
-                        );
-                        logs.push(Box::new(done_log));
+                        )));
                     }
                 }
             }
         }
 
-        let (mut f1, mut f2) = (false, false);
-        match taker_order.r#type {
-            OrderType::OrderTypeLimit => {
-                f1 = true;
-            }
-            _ => {}
-        }
-        match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
-            Ordering::Greater => {
-                f2 = true;
-            }
-            _ => {}
-        }
-
-        if f1 && f2 {
+        if let OrderType::OrderTypeLimit = taker_order.r#type
+            && Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+            // If taker has an uncompleted size, put taker in orderBook
             match taker_order.side {
                 Side::SideBuy => {
                     self.bid_depths.add(&taker_order);
@@ -361,43 +384,29 @@ impl OrderBook {
                     self.ask_depths.add(&taker_order);
                 }
             }
-
-            let log_seq = self.next_log_seq();
-            let open_log = new_open_log(log_seq, &self.product.id, &taker_order);
-            logs.push(Box::new(open_log));
+            logs.push(Box::new(new_open_log(self.next_log_seq(), &self.product.id, &taker_order)));
         } else {
             let mut remaining_size = taker_order.size;
             let mut reason = DONE_REASON_FILLED;
 
-            if !f1 {
+            if let OrderType::OrderTypeMarket = taker_order.r#type {
                 taker_order.price = Decimal::zero();
                 remaining_size = Decimal::zero();
 
-                match taker_order.side {
-                    Side::SideSell => match Decimal::cmp(&taker_order.size, &Decimal::zero()) {
-                        Ordering::Greater => {
-                            reason = DONE_REASON_CANCELLED;
-                        }
-                        _ => {}
-                    },
-                    Side::SideBuy => match Decimal::cmp(&taker_order.funds, &Decimal::zero()) {
-                        Ordering::Greater => {
-                            reason = DONE_REASON_CANCELLED;
-                        }
-                        _ => {}
-                    },
+                if let Side::SideSell = taker_order.side && Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+                    reason = DONE_REASON_CANCELLED;
+                } else if let Side::SideBuy = taker_order.side && Greater == Decimal::cmp(&taker_order.funds, &Decimal::zero()) {
+                    reason = DONE_REASON_CANCELLED;
                 }
             }
 
-            let log_seq = self.next_log_seq();
-            let done_log = new_done_log(
-                log_seq,
+            logs.push(Box::new(new_done_log(
+                self.next_log_seq(),
                 &self.product.id,
                 &taker_order,
                 &remaining_size,
                 &reason,
-            );
-            logs.push(Box::new(done_log));
+            )));
         }
 
         logs
@@ -405,37 +414,36 @@ impl OrderBook {
 
     pub fn cancel_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
-        let _ = self.order_id_window.put(order.id);
         let mut f = false;
         let mut book_order = BookOrder::default();
 
+        let _ = self.order_id_window.put(order.id);
+
         match order.side {
             Side::SideBuy => {
-                let r = self.ask_depths.orders.get(&order.id);
-                if r.is_some() {
-                    let o = r.unwrap().clone();
+                if let Some(r) = self.ask_depths.orders.get(&order.id) {
+                    let o = r.clone();
                     match self.ask_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
                         Ok(()) => {
                             f = true;
-                            book_order = o.clone();
+                            book_order = o;
                         }
                     }
                 }
             }
             Side::SideSell => {
-                let r = self.bid_depths.orders.get(&order.id);
-                if r.is_some() {
-                    let o = r.unwrap().clone();
+                if let Some(r) = self.bid_depths.orders.get(&order.id) {
+                    let o = r.clone();
                     match self.bid_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
                         Ok(()) => {
                             f = true;
-                            book_order = o.clone();
+                            book_order = o;
                         }
                     }
                 }
@@ -443,31 +451,32 @@ impl OrderBook {
         };
 
         if f {
-            let done_log = new_done_log(
+            logs.push(Box::new(new_done_log(
                 self.next_log_seq(),
                 &self.product.id,
                 &book_order,
                 &book_order.size,
                 &DONE_REASON_CANCELLED,
-            );
-            logs.push(Box::new(done_log));
+            )));
         }
+
         logs
     }
 
     pub fn nullify_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
+
         let _ = self.order_id_window.put(order.id);
 
         let book_order = BookOrder::new_book_order(order);
-        let done_log = new_done_log(
+        logs.push(Box::new(new_done_log(
             self.next_log_seq(),
             &self.product.id,
             &book_order,
             &order.size,
             &DONE_REASON_CANCELLED,
-        );
-        logs.push(Box::new(done_log));
+        )));
+
         logs
     }
 
@@ -482,12 +491,14 @@ impl OrderBook {
         snapshot
             .orders
             .reserve(self.ask_depths.orders.len() + self.bid_depths.orders.len());
+
         for (_, o) in &self.ask_depths.orders {
             snapshot.orders.push(o.clone());
         }
         for (_, o) in &self.bid_depths.orders {
             snapshot.orders.push(o.clone());
         }
+
         snapshot
     }
 
@@ -495,9 +506,11 @@ impl OrderBook {
         self.log_seq = snapshot.log_seq;
         self.trade_seq = snapshot.trade_seq;
         self.order_id_window = snapshot.order_id_window.clone();
+
         if self.order_id_window.cap == 0 {
             self.order_id_window = Window::new(0, ORDER_ID_WINDOW_CAP);
         }
+
         for o in &snapshot.orders {
             match o.side {
                 Side::SideBuy => {

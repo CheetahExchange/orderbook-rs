@@ -13,9 +13,9 @@ use crate::matching::redis_snapshot::RedisSnapshotStore;
 use crate::models::models::{Order, Product};
 use crate::models::types::{OrderStatus, TimeInForceType};
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Snapshot {
-    pub order_book_snapshot: OrderBookSnapshot,
+    pub order_book_snapshot: Option<OrderBookSnapshot>,
     pub order_offset: u64,
 }
 
@@ -97,7 +97,8 @@ impl Engine {
 
     pub fn restore(&mut self, snapshot: &Snapshot) {
         self.order_offset = snapshot.order_offset;
-        self.order_book.restore(&snapshot.order_book_snapshot);
+        self.order_book
+            .restore(&snapshot.order_book_snapshot.clone().unwrap());
     }
 
     pub async fn run_fetcher(
@@ -215,7 +216,7 @@ impl Engine {
 
                     println!("should take snapshot: {} {}-[{}]-{}->",
                         self.product_id, snapshot.order_offset, delta, order_offset);
-                    snapshot.order_book_snapshot = self.order_book.snapshot();
+                    snapshot.order_book_snapshot = Some(self.order_book.snapshot());
                     snapshot.order_offset = order_offset;
 
                     match snapshot_approve_req_tx.send(snapshot).await{
@@ -273,7 +274,7 @@ impl Engine {
 
                     match &pending {
                         Some(p) => {
-                            if seq >= p.order_book_snapshot.log_seq {
+                            if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
                                 match snapshot_tx.send(p.clone()).await{
                                     Ok(_) => {},
                                     Err(e) => {
@@ -288,7 +289,7 @@ impl Engine {
                     }
                 },
                 Some(snapshot) = snapshot_approve_req_rx.recv() => {
-                    if seq >= snapshot.order_book_snapshot.log_seq {
+                    if seq >= snapshot.order_book_snapshot.clone().unwrap().log_seq {
                         match snapshot_tx.send(snapshot.clone()).await{
                             Ok(_) => {},
                             Err(e) => {
@@ -303,7 +304,7 @@ impl Engine {
                     match &pending {
                         Some(p) => {
                             println!("discard snapshot request (seq={}), new one (seq={}) received",
-                            p.order_book_snapshot.log_seq, snapshot.order_book_snapshot.log_seq);
+                            p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
                         },
                         None => {}
                     }
@@ -326,7 +327,7 @@ impl Engine {
             select! {
                 _ = sleep(Duration::from_secs(30)) => {
                     match snapshot_req_tx.send(Snapshot{
-                        order_book_snapshot:OrderBookSnapshot::default(),
+                        order_book_snapshot: None,
                         order_offset: order_offset,
                     }).await{
                         Ok(_) => {},
@@ -345,7 +346,7 @@ impl Engine {
                         None => {}
                     }
                     println!("new snapshot stored :product={} OrderOffset={} LogSeq={}",
-                    product_id, snapshot.order_offset, snapshot.order_book_snapshot.log_seq);
+                    product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
 
                     order_offset = snapshot.order_offset;
                 }

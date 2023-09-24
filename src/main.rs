@@ -1,4 +1,5 @@
 #![feature(future_join)]
+#![feature(let_chains)]
 
 use crate::matching::engine::Engine;
 use crate::matching::kafka_log::KafkaLogStore;
