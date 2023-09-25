@@ -16,7 +16,7 @@ pub struct KafkaLogStore {
 
 impl KafkaLogStore {
     pub fn new_kafka_log_producer(
-        brokers: &[&str],
+        brokers: &Vec<String>,
         product_id: &str,
         message_time_out: u64,
     ) -> Result<KafkaLogStore, CustomError> {

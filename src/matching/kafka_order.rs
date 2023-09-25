@@ -18,7 +18,7 @@ pub struct KafkaOrderReader {
 
 impl KafkaOrderReader {
     pub fn new_kafka_order_consumer(
-        brokers: &[&str],
+        brokers: &Vec<String>,
         product_id: &str,
         session_time_out: u64,
     ) -> Result<KafkaOrderReader, CustomError> {

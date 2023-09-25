@@ -18,7 +18,7 @@ pub struct RedisSnapshotStore {
 impl RedisSnapshotStore {
     pub async fn new_redis_snapshot_store(
         product_id: &str,
-        ip: &str,
+        ip: &String,
         port: u16,
     ) -> Result<RedisSnapshotStore, CustomError> {
         return match new_redis_client(ip, port).await {

@@ -9,7 +9,10 @@ use rdkafka::producer::FutureProducer;
 pub type DefaultConsumer = StreamConsumer<DefaultConsumerContext>;
 pub type DefaultProducer = FutureProducer<DefaultProducerContext>;
 
-pub fn new_kafka_producer(brokers: &[&str], message_time_out: u64) -> KafkaResult<DefaultProducer> {
+pub fn new_kafka_producer(
+    brokers: &Vec<String>,
+    message_time_out: u64,
+) -> KafkaResult<DefaultProducer> {
     let producer: DefaultProducer = ClientConfig::new()
         .set("bootstrap.servers", brokers.join(","))
         .set(
@@ -22,7 +25,7 @@ pub fn new_kafka_producer(brokers: &[&str], message_time_out: u64) -> KafkaResul
 }
 
 pub fn new_kafka_consumer(
-    brokers: &[&str],
+    brokers: &Vec<String>,
     topic: &str,
     session_time_out: u64,
 ) -> KafkaResult<DefaultConsumer> {

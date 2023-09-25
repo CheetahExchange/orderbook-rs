@@ -6,7 +6,6 @@ use crate::matching::depth::{AskDepth, BidDepth};
 use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
 use rust_decimal::prelude::Zero;
 use std::cmp::Ordering;
-use std::cmp::Ordering::Greater;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
@@ -374,7 +373,7 @@ impl OrderBook {
         }
 
         if let OrderType::OrderTypeLimit = taker_order.r#type
-            && Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+            && Ordering::Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
             // If taker has an uncompleted size, put taker in orderBook
             match taker_order.side {
                 Side::SideBuy => {
@@ -393,9 +392,9 @@ impl OrderBook {
                 taker_order.price = Decimal::zero();
                 remaining_size = Decimal::zero();
 
-                if let Side::SideSell = taker_order.side && Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+                if let Side::SideSell = taker_order.side && Ordering::Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
                     reason = DONE_REASON_CANCELLED;
-                } else if let Side::SideBuy = taker_order.side && Greater == Decimal::cmp(&taker_order.funds, &Decimal::zero()) {
+                } else if let Side::SideBuy = taker_order.side && Ordering::Greater == Decimal::cmp(&taker_order.funds, &Decimal::zero()) {
                     reason = DONE_REASON_CANCELLED;
                 }
             }
