@@ -1,5 +1,5 @@
 use rdkafka::consumer::Consumer;
-use rdkafka::{Message, Offset, TopicPartitionList};
+use rdkafka::{Message, Offset};
 
 use std::result::Result;
 
@@ -33,12 +33,14 @@ impl KafkaOrderReader {
     }
 
     pub fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
-        let mut tpl = TopicPartitionList::new();
-        if let Err(e) = tpl.add_partition_offset(self.topic.as_str(), 0, offset) {
-            return Err(CustomError::new(&e));
-        }
-        return match self.order_consumer.assign(&tpl) {
-            Ok(_) => Ok(()),
+        return match self.order_consumer.assignment() {
+            Ok(mut tpl) => match tpl.set_all_offsets(offset) {
+                Ok(()) => match self.order_consumer.assign(&tpl) {
+                    Ok(()) => Ok(()),
+                    Err(e) => Err(CustomError::new(&e)),
+                },
+                Err(e) => Err(CustomError::new(&e)),
+            },
             Err(e) => Err(CustomError::new(&e)),
         };
     }

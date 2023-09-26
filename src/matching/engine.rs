@@ -1,4 +1,4 @@
-use log::{debug, info, error};
+use log::{debug, error, info};
 use rdkafka::Offset;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;

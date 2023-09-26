@@ -50,9 +50,7 @@ impl LogTrait for OpenLog {
 pub fn new_open_log(log_seq: u64, product_id: &str, taker_order: &BookOrder) -> OpenLog {
     debug!(
         "new_open_log: product_id: {}\nlog_seq:{}\norder:{:?}",
-        product_id,
-        log_seq,
-        taker_order
+        product_id, log_seq, taker_order
     );
     OpenLog {
         base: Base {

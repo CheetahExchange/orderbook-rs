@@ -5,7 +5,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::models::models::Product;
 
-const CONFIG_FILE_NAME: &'static str = "config.json";
+const CONFIG_FILE_NAME: &'static str = "D:/orderbook-rs/config.json";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RedisConfig {
