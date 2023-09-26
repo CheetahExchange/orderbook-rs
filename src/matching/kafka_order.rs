@@ -1,8 +1,7 @@
 use rdkafka::consumer::Consumer;
-use rdkafka::util::Timeout;
-use rdkafka::{Message, Offset};
+use rdkafka::{Message, Offset, TopicPartitionList};
+
 use std::result::Result;
-use std::time::Duration;
 
 use crate::models::models::Order;
 use crate::utils::error::CustomError;
@@ -19,11 +18,12 @@ pub struct KafkaOrderReader {
 impl KafkaOrderReader {
     pub fn new_kafka_order_consumer(
         brokers: &Vec<String>,
+        group_id: &str,
         product_id: &str,
         session_time_out: u64,
     ) -> Result<KafkaOrderReader, CustomError> {
         let topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
-        return match new_kafka_consumer(brokers, topic.as_str(), session_time_out) {
+        return match new_kafka_consumer(brokers, group_id, topic.as_str(), session_time_out) {
             Ok(dc) => Ok(KafkaOrderReader {
                 topic,
                 order_consumer: dc,
@@ -33,10 +33,11 @@ impl KafkaOrderReader {
     }
 
     pub fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
-        return match self
-            .order_consumer
-            .seek(self.topic.as_str(), 0, offset, Timeout::Never)
-        {
+        let mut tpl = TopicPartitionList::new();
+        if let Err(e) = tpl.add_partition_offset(self.topic.as_str(), 0, offset) {
+            return Err(CustomError::new(&e));
+        }
+        return match self.order_consumer.assign(&tpl) {
             Ok(_) => Ok(()),
             Err(e) => Err(CustomError::new(&e)),
         };

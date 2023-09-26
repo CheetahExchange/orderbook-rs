@@ -6,7 +6,6 @@ use crate::matching::engine::Engine;
 use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::redis_snapshot::RedisSnapshotStore;
-use crate::models::models::Product;
 
 mod config;
 mod matching;
@@ -27,6 +26,7 @@ async fn main() {
 
     let mut order_reader = KafkaOrderReader::new_kafka_order_consumer(
         &config.kafka.brokers,
+        &format!("order-reader-{}-group", config.product.id),
         &config.product.id,
         config.kafka.session_timeout,
     )

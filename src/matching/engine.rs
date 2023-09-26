@@ -1,6 +1,4 @@
-use crate::matching::kafka_log::KafkaLogStore;
-use crate::matching::kafka_order::KafkaOrderReader;
-use crate::matching::log::LogTrait;
+use log::{debug, info, error};
 use rdkafka::Offset;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -8,7 +6,11 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
 use tokio::{join, select};
 
+use crate::matching::kafka_log::KafkaLogStore;
+use crate::matching::kafka_order::KafkaOrderReader;
+use crate::matching::log::LogTrait;
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
+use crate::matching::ordering::OrderingTrait;
 use crate::matching::redis_snapshot::RedisSnapshotStore;
 use crate::models::models::{Order, Product};
 use crate::models::types::{OrderStatus, TimeInForceType};
@@ -109,22 +111,25 @@ impl Engine {
         order_reader: &mut KafkaOrderReader,
         order_tx: Sender<OffsetOrder>,
     ) {
-        let mut offset = order_offset;
-        if offset > 0 {
-            offset += 1;
-        }
-        if let Err(e) = order_reader.set_offset(Offset::Offset(offset as i64)) {
+        let offset = if order_offset == 0 {
+            Offset::Beginning
+        } else {
+            Offset::Offset(order_offset as i64 + 1)
+        };
+
+        if let Err(e) = order_reader.set_offset(offset) {
             panic!("set order reader offset error: {}", e);
         }
 
         loop {
             match order_reader.fetch_order().await {
                 Err(e) => {
-                    println!("{}", e);
+                    error!("{}", e);
                     continue;
                 }
                 Ok((offset, order)) => {
                     if let Some(o) = order {
+                        debug!("consume order: {:?}", o.clone());
                         if let Err(e) = order_tx
                             .send(OffsetOrder {
                                 offset: offset as u64,
@@ -132,7 +137,7 @@ impl Engine {
                             })
                             .await
                         {
-                            println!("{}", e);
+                            error!("{}", e);
                             continue;
                         }
                     }
@@ -192,7 +197,7 @@ impl Engine {
 
                     for log in logs {
                         if let Err(e) = log_tx.send(log).await{
-                            println!("{}", e);
+                            error!("{}", e);
                             continue;
                         }
                     }
@@ -205,14 +210,14 @@ impl Engine {
                         continue;
                     }
 
-                    println!("should take snapshot: {} {}-[{}]-{}->",
+                    info!("should take snapshot: {} {}-[{}]-{}->",
                         self.product_id, snapshot.order_offset, delta, order_offset);
 
                     snapshot.order_book_snapshot = Some(self.order_book.snapshot());
                     snapshot.order_offset = order_offset;
 
                     if let Err(e) = snapshot_approve_req_tx.send(snapshot).await {
-                        println!("{}", e);
+                        error!("{}", e);
                         continue;
                     }
                 }
@@ -239,7 +244,7 @@ impl Engine {
                 Some(log) = log_rx.recv() => {
                     // discard duplicate log
                     if log.get_seq() <= seq {
-                        println!("discard log seq={}", seq);
+                        info!("discard log seq={}", seq);
                         continue;
                     }
 
@@ -269,7 +274,7 @@ impl Engine {
                     if let Some(p) = &pending {
                         if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
                             if let Err(e) = snapshot_tx.send(p.clone()).await{
-                                println!("{}", e);
+                                error!("{}", e);
                                 continue;
                             };
                             pending = None;
@@ -279,7 +284,7 @@ impl Engine {
                 Some(snapshot) = snapshot_approve_req_rx.recv() => {
                     if seq >= snapshot.order_book_snapshot.clone().unwrap().log_seq {
                         if let Err(e) = snapshot_tx.send(snapshot.clone()).await{
-                            println!("{}", e);
+                            error!("{}", e);
                             continue;
                         };
                         pending = None;
@@ -287,7 +292,7 @@ impl Engine {
                     }
 
                     if let Some(p) = &pending {
-                        println!("discard snapshot request (seq={}), new one (seq={}) received", p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
+                        info!("discard snapshot request (seq={}), new one (seq={}) received", p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
                     }
                     pending = Some(snapshot);
                 }
@@ -313,17 +318,17 @@ impl Engine {
                         order_book_snapshot: None,
                         order_offset: order_offset,
                     }).await{
-                        println!("{}", e);
+                        error!("{}", e);
                         continue;
                     };
                 },
                 Some(snapshot) = snapshot_rx.recv() => {
                     // store snapshot
                     if let Err(e) = snapshot_store.store(&snapshot).await {
-                        println!("store snapshot failed: {}", e);
+                        error!("store snapshot failed: {}", e);
                         continue;
                     }
-                    println!("new snapshot stored :product={} OrderOffset={} LogSeq={}", product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
+                    info!("new snapshot stored :product={} OrderOffset={} LogSeq={}", product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
 
                     // update offset for next snapshot request
                     order_offset = snapshot.order_offset;

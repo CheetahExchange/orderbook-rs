@@ -1,8 +1,9 @@
-use crate::models::models::Product;
 use futures_util::future::TryFutureExt;
 use serde_derive::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+
+use crate::models::models::Product;
 
 const CONFIG_FILE_NAME: &'static str = "config.json";
 
@@ -40,6 +41,7 @@ pub async fn read_config() -> Config {
     let mut file_str = String::new();
     let _ = file
         .read_to_string(&mut file_str)
+        .await
         .unwrap_or_else(|e| panic!("read config file: {}", e));
 
     let config: Config =

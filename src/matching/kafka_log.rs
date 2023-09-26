@@ -1,10 +1,10 @@
-use crate::matching::log::LogTrait;
-use crate::utils::error::CustomError;
 use rdkafka::producer::FutureRecord;
 use rdkafka::util::Timeout;
 use std::result::Result;
-use std::time::Duration;
 
+use crate::matching::log::LogTrait;
+use crate::matching::ordering::OrderingTrait;
+use crate::utils::error::CustomError;
 use crate::utils::kafka::{new_kafka_producer, DefaultProducer};
 
 const TOPIC_BOOK_MESSAGE_PREFIX: &str = "matching_order_";

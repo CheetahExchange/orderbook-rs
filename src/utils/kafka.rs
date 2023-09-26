@@ -26,11 +26,13 @@ pub fn new_kafka_producer(
 
 pub fn new_kafka_consumer(
     brokers: &Vec<String>,
+    group_id: &str,
     topic: &str,
     session_time_out: u64,
 ) -> KafkaResult<DefaultConsumer> {
     let consumer: DefaultConsumer = ClientConfig::new()
         .set("bootstrap.servers", brokers.join(","))
+        .set("group.id", group_id)
         .set("enable.partition.eof", "false")
         .set(
             "session.timeout.ms",

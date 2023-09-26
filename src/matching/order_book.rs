@@ -1,19 +1,18 @@
-use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
+use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::matching::depth::{AskDepth, BidDepth};
-use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
-use rust_decimal::prelude::Zero;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
 
+use crate::matching::depth::{AskDepth, BidDepth};
+use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
+use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use crate::models::models::{Order, Product};
-use crate::models::types::{
-    OrderType, Side, TimeInForceType, DONE_REASON_CANCELLED, DONE_REASON_FILLED,
-};
+use crate::models::types::{OrderType, Side, TimeInForceType};
+use crate::models::types::{DONE_REASON_CANCELLED, DONE_REASON_FILLED};
 use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;

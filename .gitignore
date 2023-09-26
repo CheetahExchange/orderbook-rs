@@ -21,3 +21,5 @@ Cargo.lock
 .idea/*
 
 config.json
+
+*.exe
