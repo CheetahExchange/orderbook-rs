@@ -1,4 +1,3 @@
-use log::{debug, error, info};
 use rdkafka::Offset;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -117,19 +116,19 @@ impl Engine {
             Offset::Offset(order_offset as i64 + 1)
         };
 
-        if let Err(e) = order_reader.set_offset(offset) {
+        if let Err(e) = order_reader.set_offset(offset).await {
             panic!("set order reader offset error: {}", e);
         }
 
         loop {
             match order_reader.fetch_order().await {
                 Err(e) => {
-                    error!("{}", e);
+                    eprintln!("{}", e);
                     continue;
                 }
                 Ok((offset, order)) => {
                     if let Some(o) = order {
-                        debug!("consume order: {:?}", o.clone());
+                        println!("consume order: {:?}", o.clone());
                         if let Err(e) = order_tx
                             .send(OffsetOrder {
                                 offset: offset as u64,
@@ -137,7 +136,7 @@ impl Engine {
                             })
                             .await
                         {
-                            error!("{}", e);
+                            eprintln!("{}", e);
                             continue;
                         }
                     }
@@ -197,7 +196,7 @@ impl Engine {
 
                     for log in logs {
                         if let Err(e) = log_tx.send(log).await{
-                            error!("{}", e);
+                            eprintln!("{}", e);
                             continue;
                         }
                     }
@@ -210,14 +209,14 @@ impl Engine {
                         continue;
                     }
 
-                    info!("should take snapshot: {} {}-[{}]-{}->",
+                    println!("should take snapshot: {} {}-[{}]-{}->",
                         self.product_id, snapshot.order_offset, delta, order_offset);
 
                     snapshot.order_book_snapshot = Some(self.order_book.snapshot());
                     snapshot.order_offset = order_offset;
 
                     if let Err(e) = snapshot_approve_req_tx.send(snapshot).await {
-                        error!("{}", e);
+                        eprintln!("{}", e);
                         continue;
                     }
                 }
@@ -244,7 +243,7 @@ impl Engine {
                 Some(log) = log_rx.recv() => {
                     // discard duplicate log
                     if log.get_seq() <= seq {
-                        info!("discard log seq={}", seq);
+                        println!("discard log seq={}", seq);
                         continue;
                     }
 
@@ -274,7 +273,7 @@ impl Engine {
                     if let Some(p) = &pending {
                         if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
                             if let Err(e) = snapshot_tx.send(p.clone()).await{
-                                error!("{}", e);
+                                eprintln!("{}", e);
                                 continue;
                             };
                             pending = None;
@@ -284,7 +283,7 @@ impl Engine {
                 Some(snapshot) = snapshot_approve_req_rx.recv() => {
                     if seq >= snapshot.order_book_snapshot.clone().unwrap().log_seq {
                         if let Err(e) = snapshot_tx.send(snapshot.clone()).await{
-                            error!("{}", e);
+                            eprintln!("{}", e);
                             continue;
                         };
                         pending = None;
@@ -292,7 +291,7 @@ impl Engine {
                     }
 
                     if let Some(p) = &pending {
-                        info!("discard snapshot request (seq={}), new one (seq={}) received", p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
+                        println!("discard snapshot request (seq={}), new one (seq={}) received", p.order_book_snapshot.clone().unwrap().log_seq, snapshot.order_book_snapshot.clone().unwrap().log_seq);
                     }
                     pending = Some(snapshot);
                 }
@@ -318,17 +317,17 @@ impl Engine {
                         order_book_snapshot: None,
                         order_offset: order_offset,
                     }).await{
-                        error!("{}", e);
+                        eprintln!("{}", e);
                         continue;
                     };
                 },
                 Some(snapshot) = snapshot_rx.recv() => {
                     // store snapshot
                     if let Err(e) = snapshot_store.store(&snapshot).await {
-                        error!("store snapshot failed: {}", e);
+                        eprintln!("store snapshot failed: {}", e);
                         continue;
                     }
-                    info!("new snapshot stored :product={} OrderOffset={} LogSeq={}", product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
+                    println!("new snapshot stored :product={} OrderOffset={} LogSeq={}", product_id, snapshot.order_offset, snapshot.order_book_snapshot.unwrap().log_seq);
 
                     // update offset for next snapshot request
                     order_offset = snapshot.order_offset;

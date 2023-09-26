@@ -2,6 +2,8 @@ use rdkafka::consumer::Consumer;
 use rdkafka::{Message, Offset};
 
 use std::result::Result;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use crate::models::models::Order;
 use crate::utils::error::CustomError;
@@ -32,17 +34,31 @@ impl KafkaOrderReader {
         };
     }
 
-    pub fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
-        return match self.order_consumer.assignment() {
-            Ok(mut tpl) => match tpl.set_all_offsets(offset) {
-                Ok(()) => match self.order_consumer.assign(&tpl) {
-                    Ok(()) => Ok(()),
-                    Err(e) => Err(CustomError::new(&e)),
-                },
+    pub async fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
+        loop {
+            return match self.order_consumer.assignment() {
+                Ok(mut tpl) => {
+                    if tpl.count() == 0 {
+                        match timeout(Duration::from_secs(1), self.order_consumer.recv()).await {
+                            Ok(r) => match r {
+                                Ok(_) => continue,
+                                Err(e) => Err(CustomError::new(&e)),
+                            },
+                            Err(_) => continue,
+                        }
+                    } else {
+                        match tpl.set_all_offsets(offset) {
+                            Ok(()) => match self.order_consumer.assign(&tpl) {
+                                Ok(()) => Ok(()),
+                                Err(e) => Err(CustomError::new(&e)),
+                            },
+                            Err(e) => Err(CustomError::new(&e)),
+                        }
+                    }
+                }
                 Err(e) => Err(CustomError::new(&e)),
-            },
-            Err(e) => Err(CustomError::new(&e)),
-        };
+            };
+        }
     }
 
     pub async fn fetch_message(&mut self) -> Result<(i64, Option<Vec<u8>>), CustomError> {
