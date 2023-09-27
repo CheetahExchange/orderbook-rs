@@ -40,10 +40,12 @@ pub struct Order {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use rust_decimal::Decimal;
+
     use crate::models::models::Order;
     use crate::models::types::{OrderStatus, OrderType, Side, TimeInForceType};
-    use rust_decimal::Decimal;
-    use std::str::FromStr;
 
     #[test]
     fn test_serialize_order() {
@@ -64,5 +66,13 @@ mod tests {
 
         let s = serde_json::to_string(&order).unwrap();
         println!("{}", s);
+    }
+
+    #[test]
+    fn test_deserialize_order() {
+        let string = r#"{"id":1,"created_at":1695783003020967000,"product_id":"BTC-USD","user_id":1,"client_oid":"","price":"1000.00","size":"3.00","funds":"0","type":"limit","side":"buy","time_in_force":"GTC","status":"new"}"#;
+        let o: Order = serde_json::from_str(string).unwrap();
+
+        println!("{:?}", o);
     }
 }
