@@ -3,6 +3,7 @@ use erased_serde::serialize_trait_object;
 use serde::{Deserialize, Serialize};
 
 use chrono::prelude::*;
+use log::debug;
 use rust_decimal::Decimal;
 
 use crate::matching::order_book::BookOrder;
@@ -47,7 +48,7 @@ impl LogTrait for OpenLog {
 }
 
 pub fn new_open_log(log_seq: u64, product_id: &str, taker_order: &BookOrder) -> OpenLog {
-    println!(
+    debug!(
         "new_open_log: product_id: {}\nlog_seq:{}\norder:{:?}",
         product_id, log_seq, taker_order
     );
@@ -92,7 +93,7 @@ pub fn new_done_log(
     remaining_size: &Decimal,
     reason: &DoneReason,
 ) -> DoneLog {
-    println!(
+    debug!(
         "new_done_log: product_id: {}\nlog_seq:{}\norder_id:{}\nreason:{:?}",
         product_id,
         log_seq,
@@ -146,7 +147,7 @@ pub fn new_match_log(
     price: &Decimal,
     size: &Decimal,
 ) -> MatchLog {
-    println!(
+    debug!(
         "new_match_log: product_id: {}\nlog_seq:{}\ntrade_seq:{}\ntaker_order_id:{}\nmaker_order_id:{}\nprice:{}\nsize:{}",
         product_id,
         log_seq,

@@ -1,9 +1,10 @@
 #![feature(future_join)]
 #![feature(let_chains)]
 
+use env_logger::Builder;
+use log::LevelFilter;
+use std::io::Write;
 use std::str::FromStr;
-use tracing::{Level};
-use tracing_subscriber::FmtSubscriber;
 
 use crate::config::read_config;
 use crate::matching::engine::Engine;
@@ -17,10 +18,19 @@ mod models;
 mod utils;
 
 fn init_log(level: &str) {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::from_str(level).unwrap())
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "[{}][{}:{}] {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.file().unwrap(),
+                record.line().unwrap(),
+                record.args()
+            )
+        })
+        .filter(None, LevelFilter::from_str(level).unwrap())
+        .init();
 }
 
 #[tokio::main]

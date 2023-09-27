@@ -14,7 +14,7 @@ impl Bitmap {
     pub fn new(l: u64) -> Self {
         let r = if l % 8 == 0 { 0 } else { 1 };
         let mut v: Vec<u8> = Vec::<u8>::default();
-        v.reserve((l / 8 + r) as usize);
+        v.resize((l / 8 + r) as usize, 0);
         Bitmap { data: v }
     }
 
