@@ -10,7 +10,6 @@ use crate::matching::kafka_log::KafkaLogStore;
 use crate::matching::kafka_order::KafkaOrderReader;
 use crate::matching::log::LogTrait;
 use crate::matching::order_book::{OrderBook, OrderBookSnapshot};
-use crate::matching::ordering::OrderingTrait;
 use crate::matching::redis_snapshot::RedisSnapshotStore;
 use crate::models::models::{Order, Product};
 use crate::models::types::{OrderStatus, TimeInForceType};

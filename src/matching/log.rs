@@ -49,7 +49,7 @@ impl LogTrait for OpenLog {
 
 pub fn new_open_log(log_seq: u64, product_id: &str, taker_order: &BookOrder) -> OpenLog {
     debug!(
-        "new_open_log: product_id: {}\nlog_seq:{}\norder:{:?}",
+        "new_open_log: product_id: {} | log_seq:{} | order:{:?}",
         product_id, log_seq, taker_order
     );
     OpenLog {
@@ -94,7 +94,7 @@ pub fn new_done_log(
     reason: &DoneReason,
 ) -> DoneLog {
     debug!(
-        "new_done_log: product_id: {}\nlog_seq:{}\norder_id:{}\nreason:{:?}",
+        "new_done_log: product_id: {} | log_seq:{} | order_id:{} | reason:{:?}",
         product_id,
         log_seq,
         order.order_id.clone(),
@@ -148,7 +148,7 @@ pub fn new_match_log(
     size: &Decimal,
 ) -> MatchLog {
     debug!(
-        "new_match_log: product_id: {}\nlog_seq:{}\ntrade_seq:{}\ntaker_order_id:{}\nmaker_order_id:{}\nprice:{}\nsize:{}",
+        "new_match_log: product_id: {} | log_seq:{} | trade_seq:{} | taker_order_id:{} | maker_order_id:{} | price:{} | size:{}",
         product_id,
         log_seq,
         trade_seq,

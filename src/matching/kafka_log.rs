@@ -7,7 +7,7 @@ use crate::matching::ordering::OrderingTrait;
 use crate::utils::error::CustomError;
 use crate::utils::kafka::{new_kafka_producer, DefaultProducer};
 
-const TOPIC_BOOK_MESSAGE_PREFIX: &str = "matching_order_";
+const TOPIC_BOOK_MESSAGE_PREFIX: &str = "matching_message_";
 
 pub struct KafkaLogStore {
     pub topic: String,

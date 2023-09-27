@@ -2,6 +2,7 @@ use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+use log::info;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -229,7 +230,8 @@ impl OrderBook {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
 
         // prevent orders from being submitted repeatedly to the matching engine
-        if let Err(_) = self.order_id_window.put(order.id) {
+        if let Err(e) = self.order_id_window.put(order.id) {
+            info!("{}, order_id: {}", e, order.id);
             return logs;
         }
 
