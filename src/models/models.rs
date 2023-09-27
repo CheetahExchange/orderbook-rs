@@ -1,5 +1,6 @@
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde::{Deserializer, Serializer};
 
 use crate::models::types::*;
 
@@ -23,9 +24,17 @@ pub struct Order {
     pub price: Decimal,
     pub size: Decimal,
     pub funds: Decimal,
+    #[serde(serialize_with = "serialize_order_type")]
+    #[serde(deserialize_with = "deserialize_order_type")]
     pub r#type: OrderType,
+    #[serde(serialize_with = "serialize_side")]
+    #[serde(deserialize_with = "deserialize_side")]
     pub side: Side,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub time_in_force: TimeInForceType,
+    #[serde(serialize_with = "serialize_order_status")]
+    #[serde(deserialize_with = "deserialize_order_status")]
     pub status: OrderStatus,
 }
 

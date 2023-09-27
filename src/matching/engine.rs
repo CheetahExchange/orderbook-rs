@@ -128,7 +128,7 @@ impl Engine {
                 }
                 Ok((offset, order)) => {
                     if let Some(o) = order {
-                        debug!("consume order: {:?}", o.clone());
+                        debug!("consume order: {}", serde_json::to_string(&o).unwrap());
                         if let Err(e) = order_tx
                             .send(OffsetOrder {
                                 offset: offset as u64,

@@ -1,19 +1,44 @@
 // #[macro_use]
 use erased_serde::serialize_trait_object;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use chrono::prelude::*;
 use log::debug;
 use rust_decimal::Decimal;
 
 use crate::matching::order_book::BookOrder;
-use crate::models::types::{DoneReason, Side, TimeInForceType};
+use crate::models::types::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LogType {
     LogTypeMatch,
     LogTypeOpen,
     LogTypeDone,
+}
+
+pub fn serialize_log_type<S>(log_type: &LogType, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+{
+    let string = match log_type {
+        LogType::LogTypeMatch => "match",
+        LogType::LogTypeOpen => "open",
+        LogType::LogTypeDone => "done",
+    };
+    serializer.serialize_str(string)
+}
+
+pub fn deserialize_log_type<'de, D>(deserializer: D) -> Result<LogType, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    let string: &str = Deserialize::deserialize(deserializer)?;
+    match string {
+        "match" => Ok(LogType::LogTypeMatch),
+        "open" => Ok(LogType::LogTypeOpen),
+        "done" => Ok(LogType::LogTypeDone),
+        _ => Err(serde::de::Error::custom("invalid log_type string")),
+    }
 }
 
 pub trait LogTrait: erased_serde::Serialize {
@@ -24,6 +49,8 @@ serialize_trait_object!(LogTrait);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Base {
+    #[serde(serialize_with = "serialize_log_type")]
+    #[serde(deserialize_with = "deserialize_log_type")]
     pub r#type: LogType,
     pub sequence: u64,
     pub product_id: String,
@@ -37,7 +64,11 @@ pub struct OpenLog {
     pub user_id: u64,
     pub remaining_size: Decimal,
     pub price: Decimal,
+    #[serde(serialize_with = "serialize_side")]
+    #[serde(deserialize_with = "deserialize_side")]
     pub side: Side,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub time_in_force: TimeInForceType,
 }
 
@@ -49,8 +80,10 @@ impl LogTrait for OpenLog {
 
 pub fn new_open_log(log_seq: u64, product_id: &str, taker_order: &BookOrder) -> OpenLog {
     debug!(
-        "new_open_log: product_id: {} | log_seq:{} | order:{:?}",
-        product_id, log_seq, taker_order
+        "new_open_log: product_id: {} | log_seq:{} | order:{}",
+        product_id,
+        log_seq,
+        serde_json::to_string(&taker_order).unwrap()
     );
     OpenLog {
         base: Base {
@@ -75,8 +108,14 @@ pub struct DoneLog {
     pub user_id: u64,
     pub price: Decimal,
     pub remaining_size: Decimal,
+    #[serde(serialize_with = "serialize_done_reason")]
+    #[serde(deserialize_with = "deserialize_done_reason")]
     pub reason: DoneReason,
+    #[serde(serialize_with = "serialize_side")]
+    #[serde(deserialize_with = "deserialize_side")]
     pub side: Side,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub time_in_force: TimeInForceType,
 }
 
@@ -125,10 +164,16 @@ pub struct MatchLog {
     pub maker_order_id: u64,
     pub taker_user_id: u64,
     pub maker_user_id: u64,
+    #[serde(serialize_with = "serialize_side")]
+    #[serde(deserialize_with = "deserialize_side")]
     pub side: Side,
     pub price: Decimal,
     pub size: Decimal,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub taker_time_in_force: TimeInForceType,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub maker_time_in_force: TimeInForceType,
 }
 

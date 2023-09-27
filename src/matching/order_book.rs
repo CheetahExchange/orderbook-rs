@@ -12,8 +12,7 @@ use crate::matching::depth::{AskDepth, BidDepth};
 use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
 use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use crate::models::models::{Order, Product};
-use crate::models::types::{OrderType, Side, TimeInForceType};
-use crate::models::types::{DONE_REASON_CANCELLED, DONE_REASON_FILLED};
+use crate::models::types::*;
 use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
@@ -25,8 +24,14 @@ pub struct BookOrder {
     pub size: Decimal,
     pub funds: Decimal,
     pub price: Decimal,
+    #[serde(serialize_with = "serialize_side")]
+    #[serde(deserialize_with = "deserialize_side")]
     pub side: Side,
+    #[serde(serialize_with = "serialize_order_type")]
+    #[serde(deserialize_with = "deserialize_order_type")]
     pub r#type: OrderType,
+    #[serde(serialize_with = "serialize_time_in_force_type")]
+    #[serde(deserialize_with = "deserialize_time_in_force_type")]
     pub time_in_force: TimeInForceType,
 }
 
@@ -249,7 +254,7 @@ impl OrderBook {
         match taker_order.side {
             Side::SideBuy => {
                 for (_, v) in &(self.ask_depths.queue.clone()) {
-                    let maker_order = self.ask_depths.orders.get(v).unwrap().clone();
+                    let mut maker_order = self.ask_depths.orders.get(v).unwrap().clone();
 
                     let mut size = Decimal::default();
 
@@ -298,8 +303,9 @@ impl OrderBook {
                     if let Err(e) = self.ask_depths.decr_size(maker_order.order_id, &size) {
                         panic!("{}", e);
                     }
+                    maker_order.size = maker_order.size.sub(size);
 
-                    // matched,write a log
+                    // matched, new match log
                     let (log_seq, trade_seq) = (self.next_log_seq(), self.next_trade_seq());
                     logs.push(Box::new(new_match_log(
                         log_seq,
@@ -325,7 +331,7 @@ impl OrderBook {
             }
             Side::SideSell => {
                 for (_, v) in &(self.bid_depths.queue.clone()) {
-                    let maker_order = self.bid_depths.orders.get(v).unwrap().clone();
+                    let mut maker_order = self.bid_depths.orders.get(v).unwrap().clone();
 
                     // check whether there is price crossing between the taker and the maker
                     if Ordering::Greater == Decimal::cmp(&taker_order.price, &maker_order.price) {
@@ -346,8 +352,9 @@ impl OrderBook {
                     if let Err(e) = self.bid_depths.decr_size(maker_order.order_id, &size) {
                         panic!("{}", e);
                     }
+                    maker_order.size = maker_order.size.sub(size);
 
-                    // matched,write a log
+                    // matched, new match log
                     let (log_seq, trade_seq) = (self.next_log_seq(), self.next_trade_seq());
                     logs.push(Box::new(new_match_log(
                         log_seq,
@@ -416,6 +423,7 @@ impl OrderBook {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let mut f = false;
         let mut book_order = BookOrder::default();
+        let mut remaining_size = Decimal::default();
 
         let _ = self.order_id_window.put(order.id);
 
@@ -430,6 +438,8 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
+                            remaining_size = book_order.size;
+                            book_order.size = Decimal::zero();
                         }
                     }
                 }
@@ -444,6 +454,8 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
+                            remaining_size = book_order.size;
+                            book_order.size = Decimal::zero();
                         }
                     }
                 }
