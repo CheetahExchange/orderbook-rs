@@ -1,10 +1,11 @@
 #![feature(future_join)]
 #![feature(let_chains)]
 
-use env_logger::Builder;
-use log::LevelFilter;
 use std::io::Write;
 use std::str::FromStr;
+
+use env_logger::Builder;
+use log::LevelFilter;
 
 use crate::config::read_config;
 use crate::matching::engine::Engine;
@@ -44,8 +45,8 @@ async fn main() {
         &config.redis.ip,
         config.redis.port,
     )
-        .await
-        .unwrap_or_else(|e| panic!("{}", e));
+    .await
+    .unwrap_or_else(|e| panic!("{}", e));
 
     let mut order_reader = KafkaOrderReader::new_kafka_order_consumer(
         &config.kafka.brokers,
@@ -53,14 +54,14 @@ async fn main() {
         &config.product.id,
         config.kafka.session_timeout,
     )
-        .unwrap_or_else(|e| panic!("{}", e));
+    .unwrap_or_else(|e| panic!("{}", e));
 
     let mut log_store = KafkaLogStore::new_kafka_log_producer(
         &config.kafka.brokers,
         &config.product.id,
         config.kafka.message_timeout,
     )
-        .unwrap_or_else(|e| panic!("{}", e));
+    .unwrap_or_else(|e| panic!("{}", e));
 
     let mut engine = Engine::new(&config.product, &mut snapshot_store).await;
 

@@ -7,8 +7,8 @@ pub enum OrderType {
 }
 
 pub fn serialize_order_type<S>(order_type: &OrderType, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match order_type {
         OrderType::OrderTypeLimit => "limit",
@@ -18,8 +18,8 @@ pub fn serialize_order_type<S>(order_type: &OrderType, serializer: S) -> Result<
 }
 
 pub fn deserialize_order_type<'de, D>(deserializer: D) -> Result<OrderType, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
@@ -45,8 +45,8 @@ impl Side {
 }
 
 pub fn serialize_side<S>(side: &Side, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match side {
         Side::SideBuy => "buy",
@@ -56,8 +56,8 @@ pub fn serialize_side<S>(side: &Side, serializer: S) -> Result<S::Ok, S::Error>
 }
 
 pub fn deserialize_side<'de, D>(deserializer: D) -> Result<Side, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
@@ -79,8 +79,8 @@ pub fn serialize_time_in_force_type<S>(
     time_in_force_type: &TimeInForceType,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match time_in_force_type {
         TimeInForceType::GoodTillCanceled => "GTC",
@@ -92,8 +92,8 @@ pub fn serialize_time_in_force_type<S>(
 }
 
 pub fn deserialize_time_in_force_type<'de, D>(deserializer: D) -> Result<TimeInForceType, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
@@ -121,8 +121,8 @@ pub fn serialize_order_status<S>(
     order_status: &OrderStatus,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match order_status {
         OrderStatus::OrderStatusNew => "new",
@@ -136,8 +136,8 @@ pub fn serialize_order_status<S>(
 }
 
 pub fn deserialize_order_status<'de, D>(deserializer: D) -> Result<OrderStatus, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
@@ -158,8 +158,8 @@ pub enum DoneReason {
 }
 
 pub fn serialize_done_reason<S>(done_reason: &DoneReason, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match done_reason {
         DoneReason::DoneReasonFilled => "filled",
@@ -169,8 +169,8 @@ pub fn serialize_done_reason<S>(done_reason: &DoneReason, serializer: S) -> Resu
 }
 
 pub fn deserialize_done_reason<'de, D>(deserializer: D) -> Result<DoneReason, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
