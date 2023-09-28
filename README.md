@@ -18,6 +18,9 @@ sudo apt-get update
 sudo apt-get install git curl build-essential
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# use rust nightly toolchain
+rustup toolchain install nightly
 ```
 
 * Install Redis-server and [Kafka](https://kafka.apache.org/)

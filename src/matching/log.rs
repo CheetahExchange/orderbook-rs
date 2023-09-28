@@ -1,10 +1,9 @@
 // #[macro_use]
-use erased_serde::serialize_trait_object;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 use chrono::prelude::*;
+use erased_serde::serialize_trait_object;
 use log::debug;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::matching::order_book::BookOrder;
 use crate::models::types::*;
@@ -17,8 +16,8 @@ pub enum LogType {
 }
 
 pub fn serialize_log_type<S>(log_type: &LogType, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+where
+    S: Serializer,
 {
     let string = match log_type {
         LogType::LogTypeMatch => "match",
@@ -29,8 +28,8 @@ pub fn serialize_log_type<S>(log_type: &LogType, serializer: S) -> Result<S::Ok,
 }
 
 pub fn deserialize_log_type<'de, D>(deserializer: D) -> Result<LogType, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let string: &str = Deserialize::deserialize(deserializer)?;
     match string {
