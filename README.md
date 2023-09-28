@@ -1,8 +1,13 @@
 # orderbook-rs
 
-orderbook-rs is a `High Performance Order Matching Engine` powered by Tokio.
-
 --------
+
+### What is orderbook-rs
+
+**orderbook-rs is a High Performance Order Matching Engine powered by Tokio.**
+
+![](https://github.com/CheetahExchange/orderbook-rs/blob/main/asset/png/simple_architecture.png)
+
 
 ### Installing dependencies
 
