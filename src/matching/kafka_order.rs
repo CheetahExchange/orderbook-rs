@@ -1,8 +1,9 @@
-use rdkafka::consumer::Consumer;
-use rdkafka::{Message, Offset};
-
 use std::result::Result;
 use std::time::Duration;
+
+use rdkafka::consumer::Consumer;
+use rdkafka::error::RDKafkaErrorCode;
+use rdkafka::{Message, Offset};
 use tokio::time::timeout;
 
 use crate::models::models::Order;
@@ -42,7 +43,13 @@ impl KafkaOrderReader {
                         match timeout(Duration::from_secs(1), self.order_consumer.recv()).await {
                             Ok(r) => match r {
                                 Ok(_) => continue,
-                                Err(e) => Err(CustomError::new(&e)),
+                                Err(e) => {
+                                    // if topic not exist, continue
+                                    match e.rdkafka_error_code().unwrap() {
+                                        RDKafkaErrorCode::UnknownTopicOrPartition => continue,
+                                        _ => Err(CustomError::new(&e)),
+                                    }
+                                }
                             },
                             Err(_) => continue,
                         }
