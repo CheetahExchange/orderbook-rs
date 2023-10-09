@@ -1,9 +1,10 @@
-use rdkafka::producer::FutureRecord;
-use rdkafka::util::Timeout;
 use std::result::Result;
 
+use rdkafka::producer::FutureRecord;
+use rdkafka::util::Timeout;
+
 use crate::matching::log::LogTrait;
-use crate::matching::ordering::OrderingTrait;
+// use crate::matching::ordering::OrderingTrait;
 use crate::utils::error::CustomError;
 use crate::utils::kafka::{new_kafka_producer, DefaultProducer};
 

@@ -50,7 +50,7 @@ async fn main() {
 
     let mut order_reader = KafkaOrderReader::new_kafka_order_consumer(
         &config.kafka.brokers,
-        &format!("order-reader-{}-group", config.product.id),
+        &config.kafka.group_id,
         &config.product.id,
         config.kafka.session_timeout,
     )

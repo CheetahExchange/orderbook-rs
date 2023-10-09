@@ -14,8 +14,9 @@
     "brokers": [
       "127.0.0.1:9092"
     ],
-    "message_timeout": 30,
-    "session_timeout": 30
+    "message_timeout": 40,
+    "session_timeout": 10,
+    "group_id": "order-reader-BTC-USD-group"
   },
   "log": {
     "level": "debug"

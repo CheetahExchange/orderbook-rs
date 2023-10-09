@@ -17,6 +17,7 @@ pub struct KafkaConfig {
     pub brokers: Vec<String>,
     pub message_timeout: u64,
     pub session_timeout: u64,
+    pub group_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

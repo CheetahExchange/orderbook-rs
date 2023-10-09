@@ -1,12 +1,12 @@
-use rust_decimal::prelude::Zero;
-use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
-
-use log::info;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
+
+use log::info;
+use rust_decimal::prelude::Zero;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 use crate::matching::depth::{AskDepth, BidDepth};
 use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
@@ -423,7 +423,7 @@ impl OrderBook {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let mut f = false;
         let mut book_order = BookOrder::default();
-        let mut remaining_size = Decimal::default();
+        // let mut remaining_size = Decimal::default();
 
         let _ = self.order_id_window.put(order.id);
 
@@ -438,7 +438,7 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
-                            remaining_size = book_order.size;
+                            // remaining_size = book_order.size;
                             book_order.size = Decimal::zero();
                         }
                     }
@@ -454,7 +454,7 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
-                            remaining_size = book_order.size;
+                            // remaining_size = book_order.size;
                             book_order.size = Decimal::zero();
                         }
                     }

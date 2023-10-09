@@ -1,8 +1,9 @@
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde::{Deserializer, Serializer};
 
 use crate::models::types::*;
+
+// use serde::{Deserializer, Serializer};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Product {
