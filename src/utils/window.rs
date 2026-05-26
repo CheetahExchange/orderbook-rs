@@ -22,7 +22,7 @@ impl Window {
     }
 
     pub fn put(&mut self, val: u64) -> Result<(), CustomError> {
-        return if val <= self.min {
+        return if val < self.min {
             Err(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
@@ -30,8 +30,12 @@ impl Window {
                 )
                 .to_string(),
             ))
-        } else if val > self.max {
-            let delta = val - self.max;
+        } else if val >= self.max {
+            let delta = val - self.max + 1;
+            let range = if delta > self.cap { self.cap } else { delta };
+            for i in 0..range {
+                self.bit_map.set((self.min + i) % self.cap, false);
+            }
             self.min += delta;
             self.max += delta;
             self.bit_map.set(val % self.cap, true);
@@ -47,6 +51,10 @@ impl Window {
     }
 
     pub fn contains(&self, val: u64) -> bool {
-        self.bit_map.get(val)
+        if val < self.min || val >= self.max {
+            false
+        } else {
+            self.bit_map.get(val % self.cap)
+        }
     }
 }
