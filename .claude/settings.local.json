@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue *)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(cargo check *)"
+    ]
+  }
+}

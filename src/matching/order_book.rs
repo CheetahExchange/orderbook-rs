@@ -429,9 +429,9 @@ impl OrderBook {
 
         match order.side {
             Side::SideBuy => {
-                if let Some(r) = self.ask_depths.orders.get(&order.id) {
+                if let Some(r) = self.bid_depths.orders.get(&order.id) {
                     let o = r.clone();
-                    match self.ask_depths.decr_size(order.id, &o.size) {
+                    match self.bid_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
@@ -445,9 +445,9 @@ impl OrderBook {
                 }
             }
             Side::SideSell => {
-                if let Some(r) = self.bid_depths.orders.get(&order.id) {
+                if let Some(r) = self.ask_depths.orders.get(&order.id) {
                     let o = r.clone();
-                    match self.bid_depths.decr_size(order.id, &o.size) {
+                    match self.ask_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
