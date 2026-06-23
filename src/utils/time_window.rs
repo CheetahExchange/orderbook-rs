@@ -14,15 +14,17 @@ pub const TIME_WINDOW_DURATION: i64 = 30 * 1000;
 /// Default number of sharded order tables
 pub const DEFAULT_TABLE_SPLIT_COUNT: u64 = 128;
 
-/// Extracts the timestamp (in milliseconds since Unix epoch) from a Snowflake ID.
+/// Extracts the timestamp (in milliseconds since Snowflake epoch) from a Snowflake ID.
 ///
 /// Snowflake ID structure (64 bits):
 /// | 1 bit sign | 41 bits timestamp (ms since Snowflake epoch) | 10 bits node ID | 12 bits sequence |
 ///
 /// The timestamp is stored in bits 22-62 relative to the Snowflake epoch.
+/// Returns relative time (ms since Snowflake epoch) to match the coordinate system
+/// used by `current_time_since_snowflake_epoch()`.
 #[inline]
 pub fn extract_timestamp_from_id(order_id: u64) -> i64 {
-    ((order_id >> 22) as i64) + SNOWFLAKE_EPOCH
+    (order_id >> 22) as i64
 }
 
 /// Extracts the node ID from a Snowflake ID.
@@ -256,13 +258,13 @@ impl Default for TimeWindowSnapshot {
 mod tests {
     use super::*;
 
-    // Base timestamp for tests: Jan 1, 2020 (1577836800000 ms)
-    const TEST_BASE_TIME: i64 = 1577836800000;
+    // Base relative timestamp for tests: Jan 1, 2020 relative to Snowflake epoch
+    // 1577836800000 - 1288834974657 = 289001825343
+    const TEST_BASE_TIME: i64 = 289001825343;
 
-    fn make_snowflake_id(timestamp_ms: i64, node_id: u64, sequence: u64) -> u64 {
-        // timestamp_ms should be an absolute timestamp (ms since Unix epoch)
-        // Snowflake stores (timestamp - SNOWFLAKE_EPOCH) in the ID
-        let timestamp_part = (timestamp_ms - SNOWFLAKE_EPOCH) as u64;
+    fn make_snowflake_id(relative_timestamp_ms: i64, node_id: u64, sequence: u64) -> u64 {
+        // relative_timestamp_ms should be ms since Snowflake epoch
+        let timestamp_part = relative_timestamp_ms as u64;
         (timestamp_part << 22) | ((node_id & 0x3FF) << 12) | (sequence & 0xFFF)
     }
 
@@ -270,19 +272,19 @@ mod tests {
     fn test_extract_timestamp() {
         let window = TimeWindow::new();
 
-        // Test with a known timestamp (absolute, greater than SNOWFLAKE_EPOCH)
-        let timestamp = 1700000000000i64; // Nov 14, 2023
-        let order_id = make_snowflake_id(timestamp, 1, 1);
+        // Test with a known relative timestamp (ms since Snowflake epoch)
+        let relative_timestamp = 411165025343i64; // ~Nov 14, 2023
+        let order_id = make_snowflake_id(relative_timestamp, 1, 1);
 
         let extracted = window.extract_timestamp(order_id);
-        assert_eq!(extracted, timestamp);
+        assert_eq!(extracted, relative_timestamp);
     }
 
     #[test]
     fn test_extract_node_id() {
         // Test extracting node ID from Snowflake ID
         for node_id in [0, 1, 50, 127, 255, 1023].iter() {
-            let order_id = make_snowflake_id(1700000000000, *node_id, 123);
+            let order_id = make_snowflake_id(411165025343, *node_id, 123);
             assert_eq!(extract_node_id_from_id(order_id), *node_id);
         }
     }
@@ -295,7 +297,7 @@ mod tests {
         for user_id in [0, 1, 100, 127, 128, 255, 1000, 12345].iter() {
             // When generating an order ID, the node ID should equal user_id % split_count
             let node_id = user_id % split_count;
-            let order_id = make_snowflake_id(1700000000000, node_id, 0);
+            let order_id = make_snowflake_id(411165025343, node_id, 0);
 
             // Verify both route to the same shard
             assert_eq!(
@@ -310,10 +312,10 @@ mod tests {
     #[test]
     fn test_extract_timestamp_function() {
         // Test the standalone function
-        let timestamp = 1700000000000i64;
-        let order_id = make_snowflake_id(timestamp, 1, 1);
+        let relative_timestamp = 411165025343i64;
+        let order_id = make_snowflake_id(relative_timestamp, 1, 1);
 
-        assert_eq!(extract_timestamp_from_id(order_id), timestamp);
+        assert_eq!(extract_timestamp_from_id(order_id), relative_timestamp);
     }
 
     #[test]
