@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::info;
 use rust_decimal::prelude::Zero;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};
 
 use crate::matching::depth::{AskDepth, BidDepth};
@@ -16,14 +16,14 @@ use crate::models::models::{Order, Product};
 use crate::models::types::*;
 use crate::utils::time_window::{TimeWindow, TimeWindowSnapshot, SNOWFLAKE_EPOCH};
 
-/// Validate and normalize price to the specified scale
+/// Normalize price to the specified scale using rounding (matches Go version's Round behavior)
 fn normalize_price(price: Decimal, scale: u32) -> Decimal {
-    price.trunc_with_scale(scale)
+    price.round_dp_with_strategy(scale, RoundingStrategy::MidpointAwayFromZero)
 }
 
-/// Validate and normalize size to the specified scale
+/// Normalize size to the specified scale using rounding (matches Go version's Round behavior)
 fn normalize_size(size: Decimal, scale: u32) -> Decimal {
-    size.trunc_with_scale(scale)
+    size.round_dp_with_strategy(scale, RoundingStrategy::MidpointAwayFromZero)
 }
 
 /// Get current time in milliseconds relative to Snowflake epoch.
