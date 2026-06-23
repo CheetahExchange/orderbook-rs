@@ -92,6 +92,8 @@ pub struct OrderBookSnapshot {
     pub log_seq: u64,
     #[serde(default)]
     pub time_window: TimeWindowSnapshot,
+    #[serde(default)]
+    pub last_trade_price: Decimal,
 }
 
 pub struct OrderBook {
@@ -101,6 +103,7 @@ pub struct OrderBook {
     pub trade_seq: u64,
     pub log_seq: u64,
     time_window: TimeWindow,
+    last_trade_price: Decimal,
 }
 
 impl OrderBook {
@@ -119,6 +122,7 @@ impl OrderBook {
             trade_seq: 0,
             log_seq: 0,
             time_window: TimeWindow::new(),
+            last_trade_price: Decimal::ZERO,
         }
     }
 
@@ -364,6 +368,8 @@ impl OrderBook {
                         &size,
                     )));
 
+                    self.last_trade_price = maker_order.price;
+
                     // maker is filled
                     if maker_order.size.is_zero() {
                         logs.push(Box::new(new_done_log(
@@ -433,6 +439,8 @@ impl OrderBook {
                         &maker_order.price,
                         &size,
                     )));
+
+                    self.last_trade_price = maker_order.price;
 
                     // maker is filled
                     if maker_order.size.is_zero() {
@@ -571,6 +579,7 @@ impl OrderBook {
             trade_seq: self.trade_seq,
             log_seq: self.log_seq,
             time_window: self.time_window.snapshot(),
+            last_trade_price: self.last_trade_price,
         };
         snapshot
             .orders
@@ -589,6 +598,7 @@ impl OrderBook {
     pub fn restore(&mut self, snapshot: &OrderBookSnapshot) {
         self.log_seq = snapshot.log_seq;
         self.trade_seq = snapshot.trade_seq;
+        self.last_trade_price = snapshot.last_trade_price;
 
         // Restore time window
         self.time_window.restore(&snapshot.time_window);
