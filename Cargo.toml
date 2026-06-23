@@ -13,8 +13,8 @@ path = "src/lib.rs"
 name = "orderbook-rs"
 path = "src/main.rs"
 
-[[bin]]
-name = "test_order_sender"
+[[test]]
+name = "integration_test"
 path = "tests/integration_test.rs"
 
 [[bin]]

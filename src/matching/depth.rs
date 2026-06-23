@@ -20,7 +20,7 @@ impl<T: OrderingTrait + Ord> Depth<T> {
     }
 
     pub fn decr_size(&mut self, order_id: u64, size: &Decimal) -> Result<(), CustomError> {
-        return match self.orders.get(&order_id) {
+        match self.orders.get(&order_id) {
             Some(order) => {
                 let mut order = order.clone();
                 match Decimal::cmp(&order.size, size) {
@@ -44,7 +44,7 @@ impl<T: OrderingTrait + Ord> Depth<T> {
                 "order {} not found on book",
                 order_id
             ))),
-        };
+        }
     }
 }
 

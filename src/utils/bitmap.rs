@@ -12,7 +12,7 @@ pub struct Bitmap {
 
 impl Bitmap {
     pub fn new(l: u64) -> Self {
-        let r = if l % 8 == 0 { 0 } else { 1 };
+        let r = if l.is_multiple_of(8) { 0 } else { 1 };
         let mut v: Vec<u8> = Vec::<u8>::default();
         v.resize((l / 8 + r) as usize, 0);
         Bitmap { data: v }
@@ -26,7 +26,7 @@ impl Bitmap {
         let (byte_idx, bit_idx) = (k / 8, k % 8);
         match self.data.get(byte_idx as usize) {
             Some(byte) => {
-                return Bitmap::get_bit(*byte, bit_idx);
+                Bitmap::get_bit(*byte, bit_idx)
             }
             None => {
                 panic!("out of range");
@@ -51,19 +51,19 @@ impl Bitmap {
             panic!("wrong parameter: bit");
         }
         let ta = TA[bit_idx as usize];
-        return !(byte & ta).is_zero();
+        !(byte & ta).is_zero()
     }
 
     pub fn set_bit(byte: u8, bit_idx: u64, v: bool) -> u8 {
         if bit_idx.ge(&8u64) {
             panic!("wrong parameter: bit");
         }
-        return if v {
+        if v {
             let ta = TA[bit_idx as usize];
             byte | ta
         } else {
             let tb = TB[bit_idx as usize];
             byte & tb
-        };
+        }
     }
 }

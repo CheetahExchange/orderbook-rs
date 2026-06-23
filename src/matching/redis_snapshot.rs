@@ -33,7 +33,7 @@ impl RedisSnapshotStore {
     }
 
     pub async fn store(&mut self, snapshot: &Snapshot) -> Result<(), CustomError> {
-        return match serde_json::to_string(snapshot) {
+        match serde_json::to_string(snapshot) {
             Ok(s) => {
                 match self
                     .redis_client
@@ -47,7 +47,7 @@ impl RedisSnapshotStore {
             }
             // json serde err
             Err(e) => Err(CustomError::new(&e)),
-        };
+        }
     }
 
     pub async fn get_latest(&mut self) -> Result<Option<Snapshot>, CustomError> {

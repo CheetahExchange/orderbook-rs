@@ -37,10 +37,10 @@ pub enum Side {
 
 impl Side {
     pub fn opposite(self) -> Self {
-        return match self {
+        match self {
             Side::SideBuy => Side::SideSell,
             Side::SideSell => Side::SideBuy,
-        };
+        }
     }
 }
 

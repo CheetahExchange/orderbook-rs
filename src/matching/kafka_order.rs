@@ -26,13 +26,13 @@ impl KafkaOrderReader {
         session_time_out: u64,
     ) -> Result<KafkaOrderReader, CustomError> {
         let topic = String::from(&[TOPIC_ORDER_PREFIX, product_id].join(""));
-        return match new_kafka_consumer(brokers, group_id, topic.as_str(), session_time_out) {
+        match new_kafka_consumer(brokers, group_id, topic.as_str(), session_time_out) {
             Ok(dc) => Ok(KafkaOrderReader {
                 topic,
                 order_consumer: dc,
             }),
             Err(e) => Err(CustomError::new(&e)),
-        };
+        }
     }
 
     pub async fn set_offset(&mut self, offset: Offset) -> Result<(), CustomError> {
@@ -83,13 +83,13 @@ impl KafkaOrderReader {
     pub async fn fetch_order(&mut self) -> Result<(i64, Option<Order>), CustomError> {
         let (offset, payload) = self.fetch_message().await?;
 
-        return match payload {
+        match payload {
             None => Ok((0, None)),
             Some(v) => match serde_json::from_slice(&v) {
                 Ok(order) => Ok((offset, Some(order))),
                 // json serde err
                 Err(e) => Err(CustomError::new(&e)),
             },
-        };
+        }
     }
 }

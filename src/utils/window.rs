@@ -22,7 +22,7 @@ impl Window {
     }
 
     pub fn put(&mut self, val: u64) -> Result<(), CustomError> {
-        return if val < self.min {
+        if val < self.min {
             Err(CustomError::from_string(
                 format!(
                     "expired val {}, current Window [{}-{}]",
@@ -47,7 +47,7 @@ impl Window {
         } else {
             self.bit_map.set(val % self.cap, true);
             Ok(())
-        };
+        }
     }
 
     pub fn contains(&self, val: u64) -> bool {

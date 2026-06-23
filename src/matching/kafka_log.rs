@@ -21,13 +21,13 @@ impl KafkaLogStore {
         product_id: &str,
         message_time_out: u64,
     ) -> Result<KafkaLogStore, CustomError> {
-        return match new_kafka_producer(brokers, message_time_out) {
+        match new_kafka_producer(brokers, message_time_out) {
             Ok(dp) => Ok(KafkaLogStore {
                 topic: String::from(&[TOPIC_BOOK_MESSAGE_PREFIX, product_id].join("")),
                 log_producer: dp,
             }),
             Err(e) => Err(CustomError::new(&e)),
-        };
+        }
     }
 
     pub async fn store(&self, logs: &Vec<Box<dyn LogTrait>>) -> Result<(), CustomError> {

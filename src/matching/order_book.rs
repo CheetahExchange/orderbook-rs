@@ -17,6 +17,16 @@ use crate::utils::window::Window;
 
 const ORDER_ID_WINDOW_CAP: u64 = 10000;
 
+/// Validate and normalize price to the specified scale
+fn normalize_price(price: Decimal, scale: u32) -> Decimal {
+    price.trunc_with_scale(scale)
+}
+
+/// Validate and normalize size to the specified scale
+fn normalize_size(size: Decimal, scale: u32) -> Decimal {
+    size.trunc_with_scale(scale)
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BookOrder {
     pub order_id: u64,
@@ -156,7 +166,7 @@ impl OrderBook {
 
         match taker_order.side {
             Side::SideBuy => {
-                for (_, v) in &self.ask_depths.queue {
+                for v in self.ask_depths.queue.values() {
                     let maker_order = self.ask_depths.orders.get(v).unwrap();
 
                     // check whether there is price crossing between the taker and the maker
@@ -201,7 +211,7 @@ impl OrderBook {
                 }
             }
             Side::SideSell => {
-                for (_, v) in &self.bid_depths.queue {
+                for v in self.bid_depths.queue.values() {
                     let maker_order = self.bid_depths.orders.get(v).unwrap();
 
                     // check whether there is price crossing between the taker and the maker
@@ -222,11 +232,10 @@ impl OrderBook {
             }
         }
 
-        if let OrderType::OrderTypeLimit = taker_order.r#type {
-            if Ordering::Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
+        if let OrderType::OrderTypeLimit = taker_order.r#type
+            && Ordering::Greater == Decimal::cmp(&taker_order.size, &Decimal::zero()) {
                 return false;
             }
-        }
 
         true
     }
@@ -241,6 +250,10 @@ impl OrderBook {
         }
 
         let mut taker_order = BookOrder::new_book_order(order);
+
+        // Normalize price and size to product scales
+        taker_order.price = normalize_price(taker_order.price, self.product.quote_scale as u32);
+        taker_order.size = normalize_size(taker_order.size, self.product.base_scale as u32);
 
         // If it's a Market-Buy order, set price to infinite high, and if it's market-sell,
         // set price to zero, which ensures that prices will cross.
@@ -518,10 +531,10 @@ impl OrderBook {
             .orders
             .reserve(self.ask_depths.orders.len() + self.bid_depths.orders.len());
 
-        for (_, o) in &self.ask_depths.orders {
+        for o in self.ask_depths.orders.values() {
             snapshot.orders.push(o.clone());
         }
-        for (_, o) in &self.bid_depths.orders {
+        for o in self.bid_depths.orders.values() {
             snapshot.orders.push(o.clone());
         }
 

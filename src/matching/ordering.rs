@@ -16,7 +16,7 @@ pub struct PriceOrderIdKeyAsc {
 impl OrderingTrait for PriceOrderIdKeyAsc {
     fn new(price: &Decimal, order_id: u64) -> Self {
         PriceOrderIdKeyAsc {
-            price: price.clone(),
+            price: *price,
             order_id,
         }
     }
@@ -38,7 +38,7 @@ impl PartialOrd<Self> for PriceOrderIdKeyAsc {
 
 impl Ord for PriceOrderIdKeyAsc {
     fn cmp(&self, other: &Self) -> Ordering {
-        return match self.price.cmp(&other.price) {
+        match self.price.cmp(&other.price) {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => match self.order_id.cmp(&other.order_id) {
@@ -46,7 +46,7 @@ impl Ord for PriceOrderIdKeyAsc {
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => Ordering::Equal,
             },
-        };
+        }
     }
 }
 
@@ -59,7 +59,7 @@ pub struct PriceOrderIdKeyDesc {
 impl OrderingTrait for PriceOrderIdKeyDesc {
     fn new(price: &Decimal, order_id: u64) -> Self {
         PriceOrderIdKeyDesc {
-            price: price.clone(),
+            price: *price,
             order_id,
         }
     }
@@ -81,7 +81,7 @@ impl PartialOrd<Self> for PriceOrderIdKeyDesc {
 
 impl Ord for PriceOrderIdKeyDesc {
     fn cmp(&self, other: &Self) -> Ordering {
-        return match self.price.cmp(&other.price) {
+        match self.price.cmp(&other.price) {
             Ordering::Less => Ordering::Greater,
             Ordering::Greater => Ordering::Less,
             Ordering::Equal => match self.order_id.cmp(&other.order_id) {
@@ -89,6 +89,6 @@ impl Ord for PriceOrderIdKeyDesc {
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => Ordering::Equal,
             },
-        };
+        }
     }
 }

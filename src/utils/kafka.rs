@@ -10,7 +10,7 @@ pub type DefaultConsumer = StreamConsumer<DefaultConsumerContext>;
 pub type DefaultProducer = FutureProducer<DefaultProducerContext>;
 
 pub fn new_kafka_producer(
-    brokers: &Vec<String>,
+    brokers: &[String],
     message_time_out: u64,
 ) -> KafkaResult<DefaultProducer> {
     let producer: DefaultProducer = ClientConfig::new()
@@ -19,7 +19,7 @@ pub fn new_kafka_producer(
         .set("broker.version.fallback", "2.1.0")
         .set(
             "message.timeout.ms",
-            &format!("{}", message_time_out * 1000),
+            format!("{}", message_time_out * 1000),
         )
         .create_with_context(DefaultProducerContext)?;
 
@@ -27,7 +27,7 @@ pub fn new_kafka_producer(
 }
 
 pub fn new_kafka_consumer(
-    brokers: &Vec<String>,
+    brokers: &[String],
     group_id: &str,
     topic: &str,
     session_time_out: u64,
@@ -40,7 +40,7 @@ pub fn new_kafka_consumer(
         .set("broker.version.fallback", "2.1.0")
         .set(
             "session.timeout.ms",
-            &format!("{}", session_time_out * 1000),
+            format!("{}", session_time_out * 1000),
         )
         .set("enable.auto.commit", "true")
         .create_with_context(DefaultConsumerContext)?;

@@ -40,11 +40,8 @@ impl Engine {
             order_offset: 0,
         };
         match snapshot_store.get_latest().await {
-            Ok(o) => match o {
-                Some(snapshot) => {
-                    engine.restore(&snapshot);
-                }
-                None => {}
+            Ok(o) => if let Some(snapshot) = o {
+                engine.restore(&snapshot);
             },
             Err(e) => {
                 panic!("{}", e);
@@ -164,7 +161,7 @@ impl Engine {
                         OrderStatus::OrderStatusCancelling => {
                             logs = self.order_book.cancel_order(&offset_order.order);
                         }
-                        _ => {
+                        OrderStatus::OrderStatusNew => {
                             match offset_order.order.time_in_force {
                                 TimeInForceType::ImmediateOrCancel => {
                                     logs = self.order_book.apply_order(&offset_order.order);
@@ -191,6 +188,10 @@ impl Engine {
                                     logs = self.order_book.apply_order(&offset_order.order);
                                 },
                             }
+                        }
+                        _ => {
+                            // Ignore orders with invalid status (open, partial, filled, cancelled)
+                            info!("Ignoring order {} with invalid status: {:?}", offset_order.order.id, offset_order.order.status);
                         }
                     }
 
@@ -270,15 +271,14 @@ impl Engine {
                     logs.clear();
 
                     // approve pending snapshot
-                    if let Some(p) = &pending {
-                        if seq >= p.order_book_snapshot.clone().unwrap().log_seq {
+                    if let Some(p) = &pending
+                        && seq >= p.order_book_snapshot.clone().unwrap().log_seq {
                             if let Err(e) = snapshot_tx.send(p.clone()).await{
                                 error!("{}", e);
                                 continue;
                             };
                             pending = None;
                         }
-                    }
                 },
                 Some(snapshot) = snapshot_approve_req_rx.recv() => {
                     if seq >= snapshot.order_book_snapshot.clone().unwrap().log_seq {
@@ -315,7 +315,7 @@ impl Engine {
                     // make a new snapshot request
                     if let Err(e) = snapshot_req_tx.send(Snapshot{
                         order_book_snapshot: None,
-                        order_offset: order_offset,
+                        order_offset,
                     }).await{
                         error!("{}", e);
                         continue;
