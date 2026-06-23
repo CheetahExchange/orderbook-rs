@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::info;
 use rust_decimal::prelude::Zero;
@@ -13,9 +14,7 @@ use crate::matching::log::{new_done_log, new_match_log, new_open_log, LogTrait};
 use crate::matching::ordering::{PriceOrderIdKeyAsc, PriceOrderIdKeyDesc};
 use crate::models::models::{Order, Product};
 use crate::models::types::*;
-use crate::utils::window::Window;
-
-const ORDER_ID_WINDOW_CAP: u64 = 10000;
+use crate::utils::time_window::{TimeWindow, TimeWindowSnapshot, SNOWFLAKE_EPOCH};
 
 /// Validate and normalize price to the specified scale
 fn normalize_price(price: Decimal, scale: u32) -> Decimal {
@@ -25,6 +24,14 @@ fn normalize_price(price: Decimal, scale: u32) -> Decimal {
 /// Validate and normalize size to the specified scale
 fn normalize_size(size: Decimal, scale: u32) -> Decimal {
     size.trunc_with_scale(scale)
+}
+
+/// Get current time in milliseconds since Snowflake epoch
+fn current_time_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64 - SNOWFLAKE_EPOCH)
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -81,7 +88,8 @@ pub struct OrderBookSnapshot {
     pub orders: Vec<BookOrder>,
     pub trade_seq: u64,
     pub log_seq: u64,
-    pub order_id_window: Window,
+    #[serde(default)]
+    pub time_window: TimeWindowSnapshot,
 }
 
 pub struct OrderBook {
@@ -90,7 +98,7 @@ pub struct OrderBook {
     pub bid_depths: BidDepth,
     pub trade_seq: u64,
     pub log_seq: u64,
-    pub order_id_window: Window,
+    time_window: TimeWindow,
 }
 
 impl OrderBook {
@@ -108,7 +116,7 @@ impl OrderBook {
 
             trade_seq: 0,
             log_seq: 0,
-            order_id_window: Window::new(0, ORDER_ID_WINDOW_CAP),
+            time_window: TimeWindow::new(),
         }
     }
 
@@ -243,10 +251,27 @@ impl OrderBook {
     pub fn apply_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
 
-        // prevent orders from being submitted repeatedly to the matching engine
-        if let Err(e) = self.order_id_window.put(order.id) {
-            info!("{}, order_id: {}", e, order.id);
-            return logs;
+        // Prevent orders from being submitted repeatedly to the matching engine
+        // Get current time in milliseconds since snowflake epoch
+        let now_time = current_time_ms();
+
+        if let Err(e) = self.time_window.put(order.id, now_time) {
+            // Check if this is an "expired" order (window has moved past this order's time)
+            // This can happen when Kafka replays old messages after a restart or rebalance.
+            //
+            // If the order is not in the order book, it was never processed or already completed,
+            // so we should process it anyway (it will generate an empty result if already completed).
+            let found_in_buy = self.bid_depths.orders.contains_key(&order.id);
+            let found_in_sell = self.ask_depths.orders.contains_key(&order.id);
+
+            if found_in_buy || found_in_sell {
+                // Order is already in the book, this is a duplicate - skip it
+                info!("expired order {} already in order book, skipping", order.id);
+                return logs;
+            }
+
+            // Order not in orderBook - allow processing
+            info!("expired order {} not in order book, processing anyway", order.id);
         }
 
         let mut taker_order = BookOrder::new_book_order(order);
@@ -450,9 +475,10 @@ impl OrderBook {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
         let mut f = false;
         let mut book_order = BookOrder::default();
-        // let mut remaining_size = Decimal::default();
 
-        let _ = self.order_id_window.put(order.id);
+        // Mark order as seen in time window
+        let now_time = current_time_ms();
+        let _ = self.time_window.put(order.id, now_time);
 
         match order.side {
             Side::SideBuy => {
@@ -465,7 +491,6 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
-                            // remaining_size = book_order.size;
                             book_order.size = Decimal::zero();
                         }
                     }
@@ -481,7 +506,6 @@ impl OrderBook {
                         Ok(()) => {
                             f = true;
                             book_order = o;
-                            // remaining_size = book_order.size;
                             book_order.size = Decimal::zero();
                         }
                     }
@@ -505,7 +529,9 @@ impl OrderBook {
     pub fn nullify_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
 
-        let _ = self.order_id_window.put(order.id);
+        // Mark order as seen in time window
+        let now_time = current_time_ms();
+        let _ = self.time_window.put(order.id, now_time);
 
         let book_order = BookOrder::new_book_order(order);
         logs.push(Box::new(new_done_log(
@@ -525,7 +551,7 @@ impl OrderBook {
             orders: Vec::new(),
             trade_seq: self.trade_seq,
             log_seq: self.log_seq,
-            order_id_window: self.order_id_window.clone(),
+            time_window: self.time_window.snapshot(),
         };
         snapshot
             .orders
@@ -544,11 +570,9 @@ impl OrderBook {
     pub fn restore(&mut self, snapshot: &OrderBookSnapshot) {
         self.log_seq = snapshot.log_seq;
         self.trade_seq = snapshot.trade_seq;
-        self.order_id_window = snapshot.order_id_window.clone();
 
-        if self.order_id_window.cap == 0 {
-            self.order_id_window = Window::new(0, ORDER_ID_WINDOW_CAP);
-        }
+        // Restore time window
+        self.time_window.restore(&snapshot.time_window);
 
         for o in &snapshot.orders {
             match o.side {
@@ -560,6 +584,13 @@ impl OrderBook {
                 }
             }
         }
+    }
+
+    /// Cleanup expired orders from the time window.
+    /// This should be called periodically to prevent memory leaks when there are no new orders.
+    pub fn cleanup_time_window(&mut self) {
+        let now_time = current_time_ms();
+        self.time_window.cleanup(now_time);
     }
 
     pub fn next_log_seq(&mut self) -> u64 {

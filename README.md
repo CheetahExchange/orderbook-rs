@@ -51,6 +51,43 @@ Orders with a specified price. They will be matched against opposing orders at t
 ### Market Orders
 Orders executed immediately at the best available price. Market buy orders use `funds` field to specify the quote currency amount to spend.
 
+## Order ID Generation
+
+This engine uses **Snowflake IDs** for order identification, which are 64-bit unique identifiers with the following structure:
+
+```
+| 1 bit |     41 bits      |   10 bits   |   12 bits   |
+| Sign  | Timestamp (ms)   | Node ID     | Sequence    |
+```
+
+### Snowflake ID Structure
+
+- **Sign bit (1 bit)**: Always 0 for positive IDs
+- **Timestamp (41 bits)**: Milliseconds since Snowflake epoch (Nov 04 2010 01:42:54 UTC)
+- **Node ID (10 bits)**: Values 0-1023, used for database sharding
+- **Sequence (12 bits)**: Values 0-4095, for multiple IDs per millisecond
+
+### Why Snowflake IDs?
+
+The primary purpose of using Snowflake IDs is **database sharding**. The Node ID embedded in the order ID enables efficient data distribution across multiple database tables:
+
+1. **User-Based Sharding**: When generating an order ID, the Node ID is set to `user_id % 128` (default shard count)
+2. **Consistent Routing**: This ensures orders from the same user always route to the same shard table
+3. **Efficient Lookups**: The shard index can be extracted from either:
+   - User ID: `user_id % 128`
+   - Order ID: `(order_id >> 12) % 128` (extracts the Node ID)
+
+### Time-Based Deduplication
+
+The matching engine uses a **time-based sliding window** (30 seconds by default) for order deduplication:
+
+- Extracts timestamp from Snowflake ID using `(order_id >> 22) + SNOWFLAKE_EPOCH`
+- Rejects orders older than the window as "expired"
+- Removes duplicate orders within the window
+- Automatically cleans up expired orders during normal operation
+
+This approach is more reliable than fixed-capacity ID windows for Snowflake IDs, as the ID range can grow rapidly (up to 4M IDs per millisecond per node).
+
 ## Time-in-Force Options
 
 | Type | Code | Description |
