@@ -3,7 +3,7 @@ use rdkafka::Offset;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, Duration, interval};
 use tokio::{join, select};
 
 use crate::matching::kafka_log::KafkaLogStore;
@@ -152,6 +152,7 @@ impl Engine {
         let mut order_offset = 0u64;
         let mut order_rx = order_rx;
         let mut snapshot_req_rx = snapshot_req_rx;
+        let mut cleanup_interval = interval(Duration::from_secs(10));
 
         loop {
             select! {
@@ -224,6 +225,10 @@ impl Engine {
                         continue;
                     }
                 }
+                _ = cleanup_interval.tick() => {
+                    // Periodic cleanup of expired orders from time window
+                    self.order_book.cleanup_time_window();
+                }
             }
         }
     }
@@ -251,14 +256,12 @@ impl Engine {
                         continue;
                     }
 
-                    seq = log.get_seq();
                     logs.push(log);
 
                     // channel is not empty and buffer is not full, continue read.
                     for _ in 0..100 {
                         match log_rx.try_recv() {
                             Ok(log) => {
-                                seq = log.get_seq();
                                 logs.push(log);
                             }
                             Err(_e) => {
@@ -267,9 +270,16 @@ impl Engine {
                         }
                     }
 
-                    // store log, clean buffer
+                    // store log first, only update seq after successful persistence
                     if let Err(e) = log_store.store(&logs).await {
                         panic!("{}", e);
+                    }
+
+                    // Store succeeded, safely update seq to persisted values
+                    for l in &logs {
+                        if l.get_seq() > seq {
+                            seq = l.get_seq();
+                        }
                     }
                     logs.clear();
 
