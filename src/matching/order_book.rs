@@ -253,15 +253,21 @@ impl OrderBook {
 
         match taker_order.side {
             Side::SideBuy => {
-                for (_, v) in &(self.ask_depths.queue.clone()) {
-                    let mut maker_order = self.ask_depths.orders.get(v).unwrap().clone();
+                // Collect order IDs to match first to avoid borrow issues
+                let order_ids: Vec<u64> = self.ask_depths.queue.values().copied().collect();
 
-                    let mut size = Decimal::default();
+                for order_id in order_ids {
+                    let maker_order = match self.ask_depths.orders.get(&order_id) {
+                        Some(o) => o.clone(),
+                        None => continue,
+                    };
 
                     // check whether there is price crossing between the taker and the maker
                     if Ordering::Less == Decimal::cmp(&taker_order.price, &maker_order.price) {
                         break;
                     }
+
+                    let mut size = Decimal::default();
 
                     match taker_order.r#type {
                         OrderType::OrderTypeLimit => {
@@ -303,6 +309,7 @@ impl OrderBook {
                     if let Err(e) = self.ask_depths.decr_size(maker_order.order_id, &size) {
                         panic!("{}", e);
                     }
+                    let mut maker_order = maker_order;
                     maker_order.size = maker_order.size.sub(size);
 
                     // matched, new match log
@@ -330,8 +337,14 @@ impl OrderBook {
                 }
             }
             Side::SideSell => {
-                for (_, v) in &(self.bid_depths.queue.clone()) {
-                    let mut maker_order = self.bid_depths.orders.get(v).unwrap().clone();
+                // Collect order IDs to match first to avoid borrow issues
+                let order_ids: Vec<u64> = self.bid_depths.queue.values().copied().collect();
+
+                for order_id in order_ids {
+                    let maker_order = match self.bid_depths.orders.get(&order_id) {
+                        Some(o) => o.clone(),
+                        None => continue,
+                    };
 
                     // check whether there is price crossing between the taker and the maker
                     if Ordering::Greater == Decimal::cmp(&taker_order.price, &maker_order.price) {
@@ -352,6 +365,7 @@ impl OrderBook {
                     if let Err(e) = self.bid_depths.decr_size(maker_order.order_id, &size) {
                         panic!("{}", e);
                     }
+                    let mut maker_order = maker_order;
                     maker_order.size = maker_order.size.sub(size);
 
                     // matched, new match log
