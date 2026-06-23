@@ -26,8 +26,10 @@ fn normalize_size(size: Decimal, scale: u32) -> Decimal {
     size.trunc_with_scale(scale)
 }
 
-/// Get current time in milliseconds since Snowflake epoch
-fn current_time_ms() -> i64 {
+/// Get current time in milliseconds relative to Snowflake epoch.
+/// This is used for time-based deduplication window.
+/// Returns: (Unix timestamp ms) - SNOWFLAKE_EPOCH
+fn current_time_since_snowflake_epoch() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64 - SNOWFLAKE_EPOCH)
@@ -253,7 +255,7 @@ impl OrderBook {
 
         // Prevent orders from being submitted repeatedly to the matching engine
         // Get current time in milliseconds since snowflake epoch
-        let now_time = current_time_ms();
+        let now_time = current_time_since_snowflake_epoch();
 
         if let Err(e) = self.time_window.put(order.id, now_time) {
             // Check if this is an "expired" order (window has moved past this order's time)
@@ -477,7 +479,7 @@ impl OrderBook {
         let mut book_order = BookOrder::default();
 
         // Mark order as seen in time window
-        let now_time = current_time_ms();
+        let now_time = current_time_since_snowflake_epoch();
         let _ = self.time_window.put(order.id, now_time);
 
         match order.side {
@@ -530,7 +532,7 @@ impl OrderBook {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
 
         // Mark order as seen in time window
-        let now_time = current_time_ms();
+        let now_time = current_time_since_snowflake_epoch();
         let _ = self.time_window.put(order.id, now_time);
 
         let book_order = BookOrder::new_book_order(order);
@@ -589,7 +591,7 @@ impl OrderBook {
     /// Cleanup expired orders from the time window.
     /// This should be called periodically to prevent memory leaks when there are no new orders.
     pub fn cleanup_time_window(&mut self) {
-        let now_time = current_time_ms();
+        let now_time = current_time_since_snowflake_epoch();
         self.time_window.cleanup(now_time);
     }
 

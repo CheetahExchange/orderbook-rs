@@ -87,9 +87,6 @@ pub struct TimeWindow {
 
     /// Orders sorted by (timestamp, order_id)
     orders: BTreeMap<TimeOrderIdKey, bool>,
-
-    /// Snowflake epoch for timestamp calculation from order_id
-    epoch: i64,
 }
 
 impl Default for TimeWindow {
@@ -106,7 +103,6 @@ impl TimeWindow {
             max_time: 0,
             duration: TIME_WINDOW_DURATION,
             orders: BTreeMap::new(),
-            epoch: SNOWFLAKE_EPOCH,
         }
     }
 
@@ -117,7 +113,6 @@ impl TimeWindow {
             max_time: 0,
             duration,
             orders: BTreeMap::new(),
-            epoch: SNOWFLAKE_EPOCH,
         }
     }
 
@@ -222,16 +217,16 @@ impl TimeWindow {
             min_time: self.min_time,
             max_time: self.max_time,
             duration: self.duration,
-            epoch: self.epoch,
+            epoch: SNOWFLAKE_EPOCH,
         }
     }
 
     /// Restores the window from a snapshot.
+    /// Note: epoch is ignored since it's always SNOWFLAKE_EPOCH.
     pub fn restore(&mut self, snapshot: &TimeWindowSnapshot) {
         self.min_time = snapshot.min_time;
         self.max_time = snapshot.max_time;
         self.duration = snapshot.duration;
-        self.epoch = snapshot.epoch;
         // Orders are not restored from snapshot - they will be repopulated as orders come in
         self.orders.clear();
     }
