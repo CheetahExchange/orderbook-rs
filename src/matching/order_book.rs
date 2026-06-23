@@ -374,6 +374,20 @@ impl OrderBook {
                             &DONE_REASON_FILLED,
                         )));
                     }
+
+                    // check if taker is exhausted after this match
+                    match taker_order.r#type {
+                        OrderType::OrderTypeLimit => {
+                            if taker_order.size.is_zero() {
+                                break;
+                            }
+                        }
+                        OrderType::OrderTypeMarket => {
+                            if taker_order.funds.is_zero() {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             Side::SideSell => {
@@ -430,6 +444,11 @@ impl OrderBook {
                             &DONE_REASON_FILLED,
                         )));
                     }
+
+                    // check if taker is exhausted after this match
+                    if taker_order.size.is_zero() {
+                        break;
+                    }
                 }
             }
         }
@@ -475,8 +494,6 @@ impl OrderBook {
 
     pub fn cancel_order(&mut self, order: &Order) -> Vec<Box<dyn LogTrait>> {
         let mut logs: Vec<Box<dyn LogTrait>> = Vec::new();
-        let mut f = false;
-        let mut book_order = BookOrder::default();
 
         // Mark order as seen in time window
         let now_time = current_time_since_snowflake_epoch();
@@ -486,14 +503,19 @@ impl OrderBook {
             Side::SideBuy => {
                 if let Some(r) = self.bid_depths.orders.get(&order.id) {
                     let o = r.clone();
+                    let remaining_size = o.size;
                     match self.bid_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
                         Ok(()) => {
-                            f = true;
-                            book_order = o;
-                            book_order.size = Decimal::zero();
+                            logs.push(Box::new(new_done_log(
+                                self.next_log_seq(),
+                                &self.product.id,
+                                &o,
+                                &remaining_size,
+                                &DONE_REASON_CANCELLED,
+                            )));
                         }
                     }
                 }
@@ -501,29 +523,24 @@ impl OrderBook {
             Side::SideSell => {
                 if let Some(r) = self.ask_depths.orders.get(&order.id) {
                     let o = r.clone();
+                    let remaining_size = o.size;
                     match self.ask_depths.decr_size(order.id, &o.size) {
                         Err(e) => {
                             panic!("{}", e);
                         }
                         Ok(()) => {
-                            f = true;
-                            book_order = o;
-                            book_order.size = Decimal::zero();
+                            logs.push(Box::new(new_done_log(
+                                self.next_log_seq(),
+                                &self.product.id,
+                                &o,
+                                &remaining_size,
+                                &DONE_REASON_CANCELLED,
+                            )));
                         }
                     }
                 }
             }
         };
-
-        if f {
-            logs.push(Box::new(new_done_log(
-                self.next_log_seq(),
-                &self.product.id,
-                &book_order,
-                &book_order.size,
-                &DONE_REASON_CANCELLED,
-            )));
-        }
 
         logs
     }
