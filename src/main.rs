@@ -1,6 +1,3 @@
-#![feature(future_join)]
-#![feature(let_chains)]
-
 use std::io::Write;
 use std::str::FromStr;
 

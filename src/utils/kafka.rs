@@ -15,6 +15,8 @@ pub fn new_kafka_producer(
 ) -> KafkaResult<DefaultProducer> {
     let producer: DefaultProducer = ClientConfig::new()
         .set("bootstrap.servers", brokers.join(","))
+        .set("api.version.request", "true")
+        .set("broker.version.fallback", "2.1.0")
         .set(
             "message.timeout.ms",
             &format!("{}", message_time_out * 1000),
@@ -34,6 +36,8 @@ pub fn new_kafka_consumer(
         .set("bootstrap.servers", brokers.join(","))
         .set("group.id", group_id)
         .set("enable.partition.eof", "false")
+        .set("api.version.request", "true")
+        .set("broker.version.fallback", "2.1.0")
         .set(
             "session.timeout.ms",
             &format!("{}", session_time_out * 1000),

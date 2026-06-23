@@ -1,9 +1,25 @@
 [package]
 name = "orderbook-rs"
 version = "0.1.0"
-edition = "2018"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "orderbook_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "orderbook-rs"
+path = "src/main.rs"
+
+[[bin]]
+name = "test_order_sender"
+path = "tests/integration_test.rs"
+
+[[bin]]
+name = "log_verifier"
+path = "tests/log_verifier.rs"
 
 [dependencies]
 rdkafka = { version = "0.34.0", features = ["cmake-build"] }

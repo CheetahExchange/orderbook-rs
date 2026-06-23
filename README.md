@@ -1,140 +1,237 @@
 # orderbook-rs
 
---------
+A high-performance order matching engine built with Rust and Tokio.
 
-### What is orderbook-rs
+![Architecture](https://github.com/CheetahExchange/orderbook-rs/blob/main/asset/png/simple_architecture.png)
 
-**orderbook-rs is a High Performance Order Matching Engine powered by Tokio.**
+## Overview
 
-![](https://github.com/CheetahExchange/orderbook-rs/blob/main/asset/png/simple_architecture.png)
+**orderbook-rs** is a high-performance cryptocurrency order matching engine designed for exchanges and trading platforms. It leverages Rust's safety guarantees and Tokio's async runtime to provide reliable, low-latency order matching.
 
+### Key Features
 
-### Installing dependencies
+- **High Performance**: Built on Tokio async runtime for optimal throughput
+- **Multiple Order Types**: Supports limit orders, market orders
+- **Time-in-Force Options**: GTC (Good Till Canceled), IOC (Immediate Or Cancel), GTX (Good Till Crossing), FOK (Fill Or Kill)
+- **Price-Time Priority**: Orders at the same price level are matched in arrival order (FIFO)
+- **Fault Tolerance**: State persistence via Redis snapshots for crash recovery
+- **Event Sourcing**: All matching events published to Kafka for audit and downstream processing
 
-* Install [Rust Compiler](https://www.rust-lang.org/learn/get-started) and Cpp linker
+### Origin
+
+This project is based on the matching engine from [gitbitex-spot](https://github.com/gitbitex/gitbitex-spot), with improvements and refinements for better performance and maintainability.
+
+## Architecture
+
+The engine consists of four concurrent tasks working together:
+
+1. **Fetcher**: Reads orders from Kafka input topic
+2. **Applier**: Applies orders to the order book and generates matching logs
+3. **Committer**: Commits logs to Kafka output topic
+4. **Snapshots**: Periodically saves order book state to Redis
 
 ```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Kafka Order    │────▶│  Matching Engine │────▶│  Kafka Log      │
+│  (Order Input)  │     │  (Core Logic)    │     │  (Event Output) │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                               │
+                               ▼
+                        ┌─────────────────┐
+                        │  Redis Snapshot │
+                        │  (State Backup) │
+                        └─────────────────┘
+```
+
+## Order Types
+
+### Limit Orders
+Orders with a specified price. They will be matched against opposing orders at the same or better price, or placed on the book if no immediate match is available.
+
+### Market Orders
+Orders executed immediately at the best available price. Market buy orders use `funds` field to specify the quote currency amount to spend.
+
+## Time-in-Force Options
+
+| Type | Code | Description |
+|------|------|-------------|
+| Good Till Canceled | GTC | Order remains active until filled or cancelled |
+| Immediate Or Cancel | IOC | Execute immediately, cancel any unfilled portion |
+| Good Till Crossing | GTX | Only place order if it won't match immediately (maker-only) |
+| Fill Or Kill | FOK | Execute entire order immediately or cancel entirely |
+
+## Installing Dependencies
+
+### Install Rust Compiler
+
+```bash
 sudo apt-get update
 sudo apt-get install git curl build-essential
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# use rust nightly toolchain
-rustup toolchain install nightly
 ```
 
-* Install Redis-server and [Kafka](https://kafka.apache.org/)
+### Install Redis and Kafka
 
-```
+```bash
 sudo apt-get install redis-server
+
+# For Kafka, follow instructions at https://kafka.apache.org/
 ```
 
-### Build orderbook-rs
-```
+## Build
+
+```bash
 git clone https://github.com/CheetahExchange/orderbook-rs
 cd orderbook-rs
 
-cargo clean
 cargo build --release
 ```
 
-### Deploy and Run
+## Configuration
 
-* update config.json with the correct parameters.
+Create `config.json` with your settings:
 
-```
-cp config_example.json config.json 
-vi config.json
-./orderbook-rs
-```
-
-* the running log looks like this
-
-```
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:27 | trade_seq:7 | taker_order_id:33 | maker_order_id:28 | price:1.00 | size:998.00     
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:28 | order_id:28 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:29 | trade_seq:8 | taker_order_id:33 | maker_order_id:29 | price:2.00 | size:1.00       
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:30 | order_id:29 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:31 | trade_seq:9 | taker_order_id:33 | maker_order_id:30 | price:3.00 | size:1.00       
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:32 | order_id:30 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:33 | trade_seq:10 | taker_order_id:33 | maker_order_id:31 | price:4.00 | size:1.00      
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:34 | order_id:31 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:35 | trade_seq:11 | taker_order_id:33 | maker_order_id:32 | price:10.00 | size:499.00   
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:36 | order_id:33 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:37 | order:{"order_id":34,"user_id":1,"size":"1500.00","funds":"0.00","price":"1.00","side
-":"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:38 | order:{"order_id":35,"user_id":1,"size":"1500.00","funds":"0.00","price":"1.00","side
-":"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:39 | order:{"order_id":36,"user_id":1,"size":"2000.00","funds":"0.00","price":"10.00","sid
-e":"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:40 | order:{"order_id":37,"user_id":1,"size":"1.00","funds":"0.00","price":"11.00","side":
-"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:41 | order:{"order_id":38,"user_id":1,"size":"1.00","funds":"0.00","price":"12.00","side":
-"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:42 | order:{"order_id":39,"user_id":1,"size":"1.00","funds":"0.00","price":"13.00","side":
-"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\log.rs:82] new_open_log: product_id: BTC-USD | log_seq:43 | order:{"order_id":40,"user_id":1,"size":"3000.00","funds":"0.00","price":"1.00","side
-":"sell","type":"limit","time_in_force":"GTC"}
-[2023-09-27 17:08:17][src\matching\order_book.rs:239] Custom Error: existed val 40, order_id: 40
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:44 | trade_seq:12 | taker_order_id:41 | maker_order_id:34 | price:1.00 | size:1500.00   
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:45 | order_id:34 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:46 | trade_seq:13 | taker_order_id:41 | maker_order_id:35 | price:1.00 | size:1500.00   
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:47 | order_id:35 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:48 | order_id:41 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:195] new_match_log: product_id: BTC-USD | log_seq:49 | trade_seq:14 | taker_order_id:43 | maker_order_id:40 | price:1.00 | size:3000.00   
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:50 | order_id:40 | reason:DoneReasonFilled
-[2023-09-27 17:08:17][src\matching\log.rs:135] new_done_log: product_id: BTC-USD | log_seq:51 | order_id:43 | reason:DoneReasonFilled
-
+```json
+{
+  "product": {
+    "id": "BTC-USD",
+    "base_currency": "BTC",
+    "quote_currency": "USD",
+    "base_scale": 8,
+    "quote_scale": 2
+  },
+  "redis": {
+    "ip": "127.0.0.1",
+    "port": 6379
+  },
+  "kafka": {
+    "brokers": ["localhost:9092"],
+    "message_timeout": 5000,
+    "session_timeout": 10000,
+    "group_id": "matching_engine"
+  },
+  "log": {
+    "level": "info"
+  }
+}
 ```
 
-### How to Test
+## Run
 
-* place order test
+```bash
+./target/release/orderbook-rs
+```
+
+## Kafka Topics
+
+| Topic Pattern | Direction | Description |
+|---------------|-----------|-------------|
+| `matching_order_{product_id}` | Input | Orders to be processed |
+| `matching_message_{product_id}` | Output | Matching events (match, open, done) |
+
+## Log Types
+
+### Match Log
+Generated when a trade is executed:
+```json
+{
+  "base": {
+    "type": "match",
+    "sequence": 1,
+    "product_id": "BTC-USD",
+    "time": 1695783003020967000
+  },
+  "trade_seq": 1,
+  "taker_order_id": 1001,
+  "maker_order_id": 1002,
+  "taker_user_id": 1,
+  "maker_user_id": 2,
+  "side": "buy",
+  "price": "50000.00",
+  "size": "0.5"
+}
+```
+
+### Open Log
+Generated when an order is placed on the book:
+```json
+{
+  "base": {
+    "type": "open",
+    "sequence": 2,
+    "product_id": "BTC-USD",
+    "time": 1695783003020967000
+  },
+  "order_id": 1001,
+  "user_id": 1,
+  "remaining_size": "0.5",
+  "price": "50000.00",
+  "side": "buy",
+  "time_in_force": "GTC"
+}
+```
+
+### Done Log
+Generated when an order is completed (filled or cancelled):
+```json
+{
+  "base": {
+    "type": "done",
+    "sequence": 3,
+    "product_id": "BTC-USD",
+    "time": 1695783003020967000
+  },
+  "order_id": 1001,
+  "user_id": 1,
+  "price": "50000.00",
+  "remaining_size": "0.0",
+  "reason": "filled",
+  "side": "buy",
+  "time_in_force": "GTC"
+}
+```
+
+## Testing
+
+See [TEST_GUIDE.md](TEST_GUIDE.md) for detailed testing instructions.
+
+### Python Test Example
 
 ```python
 #!/usr/bin/env python
 # encoding: utf-8
 
-import logging
+import json
 from kafka import KafkaProducer
 from decimal import Decimal
-import json
-
-log_level = logging.DEBUG
-logging.basicConfig(level=log_level)
-log = logging.getLogger('kafka')
-log.setLevel(log_level)
-
-
-class Order:
-    def __init__(self, _id, created_at, product_id, user_id, client_oid, price, size, funds, _type, side, time_in_force,
-                 status):
-        self.id = _id
-        self.created_at = created_at
-        self.product_id = product_id
-        self.user_id = user_id
-        self.client_oid = client_oid
-        self.price = price
-        self.size = size
-        self.funds = funds
-        self.type = _type
-        self.side = side
-        self.time_in_force = time_in_force
-        self.status = status
 
 producer = KafkaProducer(bootstrap_servers='127.0.0.1:9092')
 
-order = Order(_id=43, created_at=1695783003020967000, product_id="BTC-USD", user_id=1, client_oid="",
-              price=Decimal("20.00"), size=Decimal("3000.00"), funds=Decimal("0.00"), _type="limit",
-              side="buy", time_in_force="GTC", status="new")
+order = {
+    "id": 1001,
+    "created_at": 1695783003020967000,
+    "product_id": "BTC-USD",
+    "user_id": 1,
+    "client_oid": "",
+    "price": "50000.00",
+    "size": "1.0",
+    "funds": "0.00",
+    "type": "limit",
+    "side": "buy",
+    "time_in_force": "GTC",
+    "status": "new"
+}
 
-message = json.dumps(vars(order), default=str)
-print(message)
-
-producer.send('matching_order_BTC-USD', message.encode("utf8"))
+producer.send('matching_order_BTC-USD', json.dumps(order).encode("utf8"))
 producer.flush()
 producer.close()
 ```
 
+## License
 
+This project is open source. Please refer to the LICENSE file for details.
 
+## Acknowledgments
+
+This project is based on the matching engine from [gitbitex-spot](https://github.com/gitbitex/gitbitex-spot).
