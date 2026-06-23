@@ -210,6 +210,9 @@ impl Engine {
                         continue;
                     }
 
+                    // Cleanup expired orders from time window before taking snapshot
+                    self.order_book.cleanup_time_window();
+
                     info!("should take snapshot: {} {}-[{}]-{}->",
                         self.product_id, snapshot.order_offset, delta, order_offset);
 

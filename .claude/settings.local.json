@@ -10,7 +10,14 @@
       "Bash(cargo --version)",
       "Bash(ping -n 2 192.168.1.123)",
       "Bash(powershell *)",
-      "Bash(sudo tee *)"
+      "Bash(sudo tee *)",
+      "Bash(cargo clippy *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cargo test *)",
+      "Bash(gh api *)",
+      "Bash(git show *)",
+      "Bash(cargo doc *)"
     ]
   }
 }

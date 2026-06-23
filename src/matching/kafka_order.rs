@@ -20,7 +20,7 @@ pub struct KafkaOrderReader {
 
 impl KafkaOrderReader {
     pub fn new_kafka_order_consumer(
-        brokers: &Vec<String>,
+        brokers: &[String],
         group_id: &str,
         product_id: &str,
         session_time_out: u64,
@@ -45,8 +45,8 @@ impl KafkaOrderReader {
                                 Ok(_) => continue,
                                 Err(e) => {
                                     // if topic not exist, continue
-                                    match e.rdkafka_error_code().unwrap() {
-                                        RDKafkaErrorCode::UnknownTopicOrPartition => continue,
+                                    match e.rdkafka_error_code() {
+                                        Some(RDKafkaErrorCode::UnknownTopicOrPartition) => continue,
                                         _ => Err(CustomError::new(&e)),
                                     }
                                 }

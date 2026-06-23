@@ -51,6 +51,54 @@ Orders with a specified price. They will be matched against opposing orders at t
 ### Market Orders
 Orders executed immediately at the best available price. Market buy orders use `funds` field to specify the quote currency amount to spend.
 
+## Order ID Format
+
+Orders submitted to this engine must use **Snowflake IDs** as order identifiers. Order IDs are generated externally (typically by the order service) and passed to the matching engine via Kafka.
+
+### Snowflake ID Structure (64 bits)
+
+```
+| 1 bit |     41 bits      |   10 bits   |   12 bits   |
+| Sign  | Timestamp (ms)   | Node ID     | Sequence    |
+```
+
+- **Sign bit (1 bit)**: Always 0 for positive IDs
+- **Timestamp (41 bits)**: Milliseconds since Snowflake epoch (Nov 04 2010 01:42:54 UTC)
+- **Node ID (10 bits)**: Values 0-1023, used for database sharding
+- **Sequence (12 bits)**: Values 0-4095, for multiple IDs per millisecond
+
+### Order ID Generation Rule
+
+When generating an order ID externally, the Node ID should be set to `user_id % 128`:
+
+```go
+// Example (Go with bwmarrin/snowflake library)
+node := GetTableNodeByUserId(userId)  // node ID = userId % 128
+order.Id = node.Generate().Int64()
+```
+
+This ensures:
+- Orders from the same user always route to the same database shard
+- Shard index can be extracted from order ID: `(order_id >> 12) % 128`
+
+### Why Snowflake IDs?
+
+The primary purpose is **database sharding**. The Node ID embedded in the order ID enables:
+
+1. **Consistent Routing**: Orders from the same user route to the same shard table
+2. **Efficient Lookups**: Query by user_id or order_id both lead to the correct shard
+3. **High Throughput**: Distributed ID generation without coordination
+
+### Time-Based Deduplication
+
+The matching engine uses a **time-based sliding window** (30 seconds) for order deduplication:
+
+- Extracts timestamp from Snowflake ID: `(order_id >> 22) + SNOWFLAKE_EPOCH`
+- Rejects orders older than the window as "expired"
+- Removes duplicate orders within the window
+
+This is more reliable than fixed-capacity ID windows for Snowflake IDs, as the ID range can grow rapidly (up to 4M IDs per millisecond per node).
+
 ## Time-in-Force Options
 
 | Type | Code | Description |
