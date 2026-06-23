@@ -1,6 +1,5 @@
-use bytes::Bytes;
-use mini_redis::client::Client;
-use serde_json;
+use redis::Client;
+use redis::AsyncCommands;
 use std::result::Result;
 
 use crate::matching::engine::Snapshot;
@@ -21,52 +20,43 @@ impl RedisSnapshotStore {
         ip: &str,
         port: u16,
     ) -> Result<RedisSnapshotStore, CustomError> {
-        return match new_redis_client(ip, port).await {
+        match new_redis_client(ip, port).await {
             Ok(c) => Ok(RedisSnapshotStore {
                 product_id: product_id.to_string(),
-                snapshot_key: String::from(&[TOPIC_SNAPSHOT_PREFIX, product_id].join("")),
+                snapshot_key: [TOPIC_SNAPSHOT_PREFIX, product_id].join(""),
                 redis_client: c,
             }),
-            // redis connect err
-            Err(e) => Err(CustomError::new(e.as_ref())),
-        };
-    }
-
-    pub async fn store(&mut self, snapshot: &Snapshot) -> Result<(), CustomError> {
-        match serde_json::to_string(snapshot) {
-            Ok(s) => {
-                match self
-                    .redis_client
-                    .set(self.snapshot_key.as_str(), Bytes::from(s))
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    // redis set err
-                    Err(e) => Err(CustomError::new(e.as_ref())),
-                }
-            }
-            // json serde err
-            Err(e) => Err(CustomError::new(&e)),
+            Err(e) => Err(CustomError::from_string(format!("{}", e))),
         }
     }
 
+    pub async fn store(&mut self, snapshot: &Snapshot) -> Result<(), CustomError> {
+        let s = serde_json::to_string(snapshot)
+            .map_err(|e| CustomError::new(&e))?;
+
+        let mut conn = self.redis_client.get_multiplexed_async_connection().await
+            .map_err(|e| CustomError::from_string(format!("{}", e)))?;
+
+        conn.set::<_, _, ()>(&self.snapshot_key, &s).await
+            .map_err(|e| CustomError::from_string(format!("{}", e)))?;
+
+        Ok(())
+    }
+
     pub async fn get_latest(&mut self) -> Result<Option<Snapshot>, CustomError> {
-        return match self.redis_client.get(self.snapshot_key.as_str()).await {
-            Ok(obs) => match obs {
-                Some(bs) => match String::from_utf8(bs.to_vec()) {
-                    Ok(s) => match serde_json::from_str(&s) {
-                        Ok(snapshot) => Ok(Some(snapshot)),
-                        // json obj from str err
-                        Err(e) => Err(CustomError::new(&e)),
-                    },
-                    //bytes to utf8 str err
-                    Err(e) => Err(CustomError::new(&e)),
-                },
-                // redis get none
-                None => Ok(None),
-            },
-            // redis get err
-            Err(e) => Err(CustomError::new(e.as_ref())),
-        };
+        let mut conn = self.redis_client.get_multiplexed_async_connection().await
+            .map_err(|e| CustomError::from_string(format!("{}", e)))?;
+
+        let result: Option<String> = conn.get(&self.snapshot_key).await
+            .map_err(|e| CustomError::from_string(format!("{}", e)))?;
+
+        match result {
+            Some(s) => {
+                let snapshot: Snapshot = serde_json::from_str(&s)
+                    .map_err(|e| CustomError::new(&e))?;
+                Ok(Some(snapshot))
+            }
+            None => Ok(None),
+        }
     }
 }
