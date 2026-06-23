@@ -45,8 +45,8 @@ impl KafkaOrderReader {
                                 Ok(_) => continue,
                                 Err(e) => {
                                     // if topic not exist, continue
-                                    match e.rdkafka_error_code().unwrap() {
-                                        RDKafkaErrorCode::UnknownTopicOrPartition => continue,
+                                    match e.rdkafka_error_code() {
+                                        Some(RDKafkaErrorCode::UnknownTopicOrPartition) => continue,
                                         _ => Err(CustomError::new(&e)),
                                     }
                                 }
