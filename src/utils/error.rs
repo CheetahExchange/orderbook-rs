@@ -2,11 +2,11 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct CustomError(pub String);
+pub struct CustomError(String);
 
 impl CustomError {
     pub fn new(e: &dyn Error) -> Self {
-        CustomError(format!("{}", e).to_string())
+        CustomError(format!("{}", e))
     }
 
     pub fn from_string(s: String) -> Self {

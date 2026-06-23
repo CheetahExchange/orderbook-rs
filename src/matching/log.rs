@@ -1,4 +1,3 @@
-// #[macro_use]
 use chrono::prelude::*;
 use erased_serde::serialize_trait_object;
 use log::debug;
@@ -135,8 +134,8 @@ pub fn new_done_log(
         "new_done_log: product_id: {} | log_seq:{} | order_id:{} | reason:{:?}",
         product_id,
         log_seq,
-        order.order_id.clone(),
-        reason.clone()
+        order.order_id,
+        reason
     );
     DoneLog {
         base: Base {
@@ -196,10 +195,10 @@ pub fn new_match_log(
         product_id,
         log_seq,
         trade_seq,
-        taker_order.order_id.clone(),
-        maker_order.order_id.clone(),
-        price.clone(),
-        size.clone()
+        taker_order.order_id,
+        maker_order.order_id,
+        price,
+        size
     );
     MatchLog {
         base: Base {
