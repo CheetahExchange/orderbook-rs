@@ -6,7 +6,7 @@ A high-performance order matching engine built with Rust and Tokio.
 
 ## Overview
 
-**orderbook-rs** is a high-performance cryptocurrency order matching engine designed for exchanges and trading platforms. It leverages Rust's safety guarantees and Tokio's async runtime to provide reliable, low-latency order matching.
+**orderbook-rs** is a high-performance cryptocurrency order matching engine designed for exchanges and trading platforms. It leverages Rust's safety guarantees and Tokio's async runtime to provide [...]
 
 ### Key Features
 
@@ -91,13 +91,30 @@ The primary purpose is **database sharding**. The Node ID embedded in the order 
 
 ### Time-Based Deduplication
 
-The matching engine uses a **time-based sliding window** (30 seconds) for order deduplication:
+The matching engine uses a **time-based sliding window** (30 seconds) for order deduplication.
 
-- Extracts timestamp from Snowflake ID: `(order_id >> 22) + SNOWFLAKE_EPOCH`
-- Rejects orders older than the window as "expired"
-- Removes duplicate orders within the window
+Clarification about timestamp extraction:
 
-This is more reliable than fixed-capacity ID windows for Snowflake IDs, as the ID range can grow rapidly (up to 4M IDs per millisecond per node).
+- The 41-bit timestamp field inside a Snowflake ID stores milliseconds *since the Snowflake epoch* (SNOWFLAKE_EPOCH = 1288834974657, i.e. 2010-11-04T01:42:54Z).
+- Extract the relative timestamp (ms since Snowflake epoch) with:
+
+```rust
+fn extract_relative_ms(order_id: u64) -> i64 {
+    (order_id >> 22) as i64
+}
+```
+
+- To obtain an absolute Unix epoch millisecond timestamp, add SNOWFLAKE_EPOCH:
+
+```rust
+fn extract_unix_ms(order_id: u64) -> i64 {
+    extract_relative_ms(order_id) + SNOWFLAKE_EPOCH
+}
+```
+
+Note on repository code: the code in `src/utils/time_window.rs` and related functions uses the *relative* timestamp (ms since SNOWFLAKE_EPOCH) when comparing against the window and when calling `current_time_since_snowflake_epoch()` — so do NOT add SNOWFLAKE_EPOCH in those comparisons. If you need a human-readable Unix timestamp (or to log wall-clock time), then add SNOWFLAKE_EPOCH.
+
+This approach is more reliable than fixed-capacity ID windows for Snowflake IDs, as the ID range can grow rapidly (up to ~4M sequence values per millisecond per node).
 
 ## Time-in-Force Options
 
